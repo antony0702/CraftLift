@@ -2,13 +2,28 @@ import type { AuthStatus } from '@shared/types'
 import { runGcloud, runGcloudJson } from './exec'
 
 /**
+ * 登入狀態的快取。
+ *
+ * 每次 gcloud 呼叫在 Windows 上都要三秒多（Python 直譯器啟動），而登入
+ * 狀態在一次執行期間幾乎不會變。查過一次就記住，登入或登出時再失效。
+ */
+let cached: AuthStatus | null = null
+
+/**
  * 查詢目前登入的 Google 帳號。
  * 只讀取本機既有的憑證，不會觸發任何登入流程。
  */
-export async function getAuthStatus(): Promise<AuthStatus> {
+export async function getAuthStatus(force = false): Promise<AuthStatus> {
+  if (cached && !force) return cached
   const accounts = await runGcloudJson<Array<{ account: string; status: string }>>(['auth', 'list'])
   const active = accounts.find((a) => a.status === 'ACTIVE')
-  return { loggedIn: Boolean(active), account: active?.account ?? null }
+  cached = { loggedIn: Boolean(active), account: active?.account ?? null }
+  return cached
+}
+
+/** 登入或登出後呼叫，讓下次查詢重新問一次 gcloud */
+export function invalidateAuthCache(): void {
+  cached = null
 }
 
 /**
@@ -24,5 +39,6 @@ export async function getAuthStatus(): Promise<AuthStatus> {
  */
 export async function login(): Promise<AuthStatus> {
   await runGcloud(['auth', 'login', '--brief'])
-  return getAuthStatus()
+  invalidateAuthCache()
+  return getAuthStatus(true)
 }

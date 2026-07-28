@@ -41,22 +41,36 @@ export default function Setup({
   const [detected, setDetected] = useState(0)
   const [message, setMessage] = useState('')
   const [copied, setCopied] = useState(false)
+  /** 檢查階段正在等哪一項。gcloud 每個呼叫都要好幾秒，不講的話畫面像當掉。 */
+  const [progress, setProgress] = useState<'account' | 'billing'>('account')
 
   const check = useCallback(async () => {
     setPhase('checking')
     setMessage('')
     try {
+      // gcloud 是否安裝只查檔案系統，不會等
       const gcloud = await call(window.api.gcloud.status())
       setVersion(gcloud.version)
       if (!gcloud.installed) return setPhase('gcloud-missing')
 
-      const auth = await call(window.api.gcloud.authStatus())
+      /*
+       * 登入狀態與專案查詢併行。
+       *
+       * 每個 gcloud 呼叫在 Windows 上都要三到五秒（Python 直譯器啟動），
+       * 排成一列等就是十幾秒。兩者其實不互相依賴——沒登入時專案查詢
+       * 只會失敗，把它的錯誤吞掉即可，不值得為此多等一輪。
+       */
+      setProgress('account')
+      const [auth, project] = await Promise.all([
+        call(window.api.gcloud.authStatus()),
+        window.api.project.current().then((r) => (r.ok ? r.data : null))
+      ])
+
       setAccount(auth.account)
       if (!auth.loggedIn) return setPhase('need-login')
+      if (project) return onReady(project)
 
-      const existing = await call(window.api.project.current())
-      if (existing) return onReady(existing)
-
+      setProgress('billing')
       const accounts = await call(window.api.project.billingAccounts())
       const usable = accounts.filter((a) => a.open)
       setDetected(accounts.length)
@@ -119,7 +133,14 @@ export default function Setup({
 
   return (
     <div className="screen narrow">
-      {phase === 'checking' && <Loading text={t('setup.checking')} />}
+      {phase === 'checking' && (
+        <>
+          <Loading text={t(`setup.checking.${progress}`)} />
+          <p className="muted small" style={{ textAlign: 'center' }}>
+            {t('setup.checking.slow')}
+          </p>
+        </>
+      )}
 
       {phase === 'gcloud-missing' && (
         <>

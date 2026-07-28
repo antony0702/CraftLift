@@ -26,7 +26,11 @@ export default {
     UNKNOWN: 'Unknown'
   },
   setup: {
-    checking: 'Checking your environment…',
+    checking: {
+      account: 'Checking your Google account…',
+      billing: 'Looking up your billing accounts…',
+      slow: 'Google’s command-line tool takes a few seconds to start up each time. That is its normal speed, not a hang.'
+    },
     gcloudMissing: {
       title: 'Google Cloud CLI is required',
       desc: 'CraftLift drives your cloud account through Google’s official command-line tool. This way the sign-in flow never shows an “unverified app” warning, and there is no cap on how many people can use CraftLift.',
@@ -273,7 +277,8 @@ export default {
     theme: 'Appearance',
     themes: { system: 'Match system', light: 'Light', dark: 'Dark' },
     scale: 'Interface size',
-    scaleHint: 'Scales the whole interface — text, spacing and icons. Takes effect immediately.',
+    scaleAuto: 'Match window size',
+    scaleHint: 'Scales the whole interface — text, spacing and icons. With “Match window size”, everything grows as you enlarge the window. Takes effect immediately.',
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:

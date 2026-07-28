@@ -26,7 +26,11 @@ export default {
     UNKNOWN: '狀態不明'
   },
   setup: {
-    checking: '正在檢查環境……',
+    checking: {
+      account: '正在確認你的 Google 帳號……',
+      billing: '正在查詢你的帳單帳戶……',
+      slow: 'Google 的命令列工具啟動一次需要好幾秒，這是它的正常速度，不是當掉了。'
+    },
     gcloudMissing: {
       title: '需要先安裝 Google Cloud CLI',
       desc: 'CraftLift 透過 Google 官方的命令列工具來操作你的雲端帳號。這樣做的好處是登入時不會出現「應用程式未經驗證」的警告畫面，也沒有使用人數限制。',
@@ -259,7 +263,8 @@ export default {
     theme: '介面配色',
     themes: { system: '跟隨系統', light: '淺色', dark: '深色' },
     scale: '介面大小',
-    scaleHint: '整體放大縮小介面，包含文字、間距與圖示。改完立即生效，不需要重新啟動。',
+    scaleAuto: '跟著視窗大小',
+    scaleHint: '整體放大縮小介面，包含文字、間距與圖示。選「跟著視窗大小」時，把視窗拉大介面就等比變大。改完立即生效。',
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:

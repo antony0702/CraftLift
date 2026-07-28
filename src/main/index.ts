@@ -1,7 +1,13 @@
 import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { registerIpcHandlers } from './ipc'
-import { applyLaunchAtLogin, applyTheme, effectiveTheme, getPreferences } from './preferences'
+import {
+  applyLaunchAtLogin,
+  applyTheme,
+  autoScaleFor,
+  effectiveTheme,
+  getPreferences
+} from './preferences'
 import { closeAllConnections } from './server/ssh'
 
 /**
@@ -39,11 +45,22 @@ function createWindow(show = true): void {
 
   mainWindow.on('ready-to-show', () => {
     if (show) mainWindow?.show()
-    // 套用使用者設定的介面縮放。畫面跑在沙箱裡拿不到 webFrame，
-    // 所以縮放一律由主行程設定。
-    void getPreferences().then((prefs) => {
-      mainWindow?.webContents.setZoomFactor(prefs.uiScale)
-    })
+    void applyZoom()
+  })
+
+  /**
+   * 視窗大小改變時重算縮放。
+   *
+   * 拖曳邊框時 resize 會連續觸發上百次，每次都設定縮放會讓畫面抖動，
+   * 所以延遲到停手之後再套用。
+   *
+   * 注意：setZoomFactor 不會反過來改變 getContentSize 回傳的值
+   * （那是與縮放無關的邏輯像素），所以這裡不會形成迴圈。
+   */
+  let resizeTimer: NodeJS.Timeout | null = null
+  mainWindow.on('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => void applyZoom(), 80)
   })
 
   /**
@@ -72,6 +89,28 @@ function createWindow(show = true): void {
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+/**
+ * 套用介面縮放。
+ *
+ * 縮放必須由主行程設定：畫面跑在沙箱裡，拿不到 webFrame。
+ * 設定為 'auto' 時依視窗大小換算，否則用使用者指定的固定倍率。
+ */
+/** 上次實際套用的縮放。相同就不重設，避免無謂的整頁重排。 */
+let appliedZoom = 0
+
+async function applyZoom(): Promise<void> {
+  if (!mainWindow) return
+  const prefs = await getPreferences()
+  const [width, height] = mainWindow.getContentSize()
+  const factor = prefs.uiScale === 'auto' ? autoScaleFor(width, height) : prefs.uiScale
+
+  // setZoomFactor 會強制整頁重新排版與重繪。拖曳視窗邊框時，縮放值
+  // 四捨五入到小數兩位後其實常常沒變，這時再設一次只是白白讓畫面頓一下。
+  if (factor === appliedZoom) return
+  appliedZoom = factor
+  mainWindow.webContents.setZoomFactor(factor)
 }
 
 function showWindow(): void {

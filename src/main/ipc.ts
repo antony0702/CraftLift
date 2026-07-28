@@ -41,6 +41,7 @@ import { closeAllConnections, closeConnection, getConnection } from './server/ss
 import type { ServerConnection } from './server/ssh'
 import * as ops from './server/operations'
 import {
+  autoScaleFor,
   defaultLocalBackupDir,
   effectiveTheme,
   getPreferences,
@@ -103,14 +104,37 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   // --- 專案 -----------------------------------------------------------------
   handle('project:billingAccounts', async (): Promise<BillingAccount[]> => listBillingAccounts())
 
+  /**
+   * 目前使用的專案。
+   *
+   * 查詢 GCP 要四秒多，每次啟動都等太久，所以先回傳上次記住的值讓畫面
+   * 立刻出來，再在背景向 GCP 核對。核對結果不同時更新快取——下次啟動
+   * 就會是對的。真正的來源始終是 GCP 上的標籤，這裡只是加速。
+   */
   handle('project:current', async (): Promise<string | null> => {
+    if (currentProjectId) return currentProjectId
+
+    const prefs = await getPreferences()
+    if (prefs.lastProjectId) {
+      currentProjectId = prefs.lastProjectId
+      void findExistingProject().then(async (actual) => {
+        if (actual !== prefs.lastProjectId) {
+          currentProjectId = actual
+          await setPreferences({ lastProjectId: actual })
+        }
+      })
+      return currentProjectId
+    }
+
     currentProjectId = await findExistingProject()
+    if (currentProjectId) await setPreferences({ lastProjectId: currentProjectId })
     return currentProjectId
   })
 
   handle('project:ensure', async (billingAccountId: string): Promise<string> => {
     const project = await ensureProject(billingAccountId)
     currentProjectId = project.projectId
+    await setPreferences({ lastProjectId: project.projectId })
     return project.projectId
   })
 
@@ -119,6 +143,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     closeAllConnections()
     await deleteProject(projectId)
     currentProjectId = null
+    await setPreferences({ lastProjectId: null })
   })
 
   // --- Minecraft 版本 -------------------------------------------------------
@@ -323,9 +348,16 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('prefs:get', getPreferences)
   handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> => {
     const next = await setPreferences(updates)
-    // 縮放要由主行程套用：畫面跑在沙箱裡，拿不到 webFrame。
+    // 縮放要由主行程套用：畫面跑在沙箱裡拿不到 webFrame。
+    // 這裡就地計算而非呼叫 index.ts 的函式，避免兩個模組互相匯入。
     if (updates.uiScale !== undefined) {
-      getWindow()?.webContents.setZoomFactor(next.uiScale)
+      const window = getWindow()
+      if (window) {
+        const [w, h] = window.getContentSize()
+        window.webContents.setZoomFactor(
+          next.uiScale === 'auto' ? autoScaleFor(w, h) : next.uiScale
+        )
+      }
     }
     return next
   })

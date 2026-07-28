@@ -97,6 +97,51 @@ body {
   user-select: text;
 }
 
+/* ── 捲軸 ─────────────────────────────────────────────────────
+   Windows 原生捲軸是圓角淺灰的，跟這套硬邊像素語彙格格不入。
+   自己畫一支：方形、無圓角、寬度用 11px 對齊格線。
+   一旦覆寫 ::-webkit-scrollbar，系統捲軸就完全不會出現。 */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--stone-800);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--edge);
+  /* 用邊框在滑塊兩側留出軌道色的細縫，滑塊才不會貼滿整條軌道 */
+  border-left: 2px solid var(--stone-800);
+  border-right: 2px solid var(--stone-800);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dust);
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--torch);
+}
+::-webkit-scrollbar-corner {
+  background: var(--stone-800);
+}
+/* 預設的上下箭頭在深色底上是兩個空白方塊，比沒有還醜 */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* 日誌永遠是深色的，它的捲軸也要跟著深，不能用主題色 */
+.log::-webkit-scrollbar-track,
+.log::-webkit-scrollbar-corner {
+  background: #14100b;
+}
+.log::-webkit-scrollbar-thumb {
+  background: #3a3129;
+  border-left-color: #14100b;
+  border-right-color: #14100b;
+}
+.log::-webkit-scrollbar-thumb:hover {
+  background: #5c4e40;
+}
+
 /* ── 排版基礎 ───────────────────────────────────────────────── */
 h1,
 h2,

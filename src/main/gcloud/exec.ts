@@ -121,16 +121,33 @@ export async function runGcloudJson<T>(args: GcloudArg[]): Promise<T> {
   return JSON.parse(trimmed) as T
 }
 
-/** 檢查 gcloud 是否已安裝，並取得版本 */
+/** 版本字串只用於顯示，取得後就記住，不必每次都問 */
+let cachedVersion: string | null = null
+
+/**
+ * 檢查 gcloud 是否已安裝。
+ *
+ * 刻意不執行 `gcloud version`。Windows 上的 gcloud 是 Python CLI，
+ * 光是啟動直譯器就要三秒多，而這個檢查在首次設定畫面是擋在最前面的，
+ * 使用者會直接感受到那三秒。檔案存在就當作已安裝——真的壞掉的話，
+ * 後面第一個實際指令就會報錯，而且錯誤訊息比這裡準確得多。
+ *
+ * 版本字串只用於顯示，在背景慢慢取得即可。
+ */
 export async function getGcloudStatus(): Promise<GcloudStatus> {
   const path = await findGcloud()
   if (!path) return { installed: false, path: null, version: null }
 
+  if (cachedVersion === null) void warmVersion()
+  return { installed: true, path, version: cachedVersion }
+}
+
+/** 在背景取得版本字串，不擋任何流程 */
+async function warmVersion(): Promise<void> {
   try {
     const parsed = await runGcloudJson<Record<string, string>>(['version'])
-    return { installed: true, path, version: parsed['Google Cloud SDK'] ?? null }
+    cachedVersion = parsed['Google Cloud SDK'] ?? null
   } catch {
-    // 檔案存在但跑不起來——可能安裝損毀，當作未安裝比較安全
-    return { installed: false, path, version: null }
+    // 取不到版本不影響任何功能，顯示空白即可
   }
 }

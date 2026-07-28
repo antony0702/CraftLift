@@ -10,13 +10,24 @@ import { supportedLanguages } from '../i18n'
 const THEMES: ThemeChoice[] = ['system', 'light', 'dark']
 
 /**
- * 介面縮放的可選倍率。
+ * 介面縮放的選項。
  *
- * 級距刻意做細（5%）。100% 的 11px 偏小、125% 又過大，舒服的點就落在
- * 中間那一段，級距太粗會找不到。非 11 倍數的倍率會讓點陣字略微變糊，
- * 但實測觀感影響很小，遠不如字太小來得難用。
+ * 'auto' 讓整個介面跟著視窗大小等比縮放；其餘是固定倍率，級距刻意做細，
+ * 因為舒服的點落在 100% 到 125% 之間，級距太粗會找不到。
  */
-const SCALES = [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.35, 1.5, 1.75, 2]
+const SCALES: Array<number | 'auto'> = [
+  'auto',
+  1,
+  1.05,
+  1.1,
+  1.15,
+  1.2,
+  1.25,
+  1.35,
+  1.5,
+  1.75,
+  2
+]
 
 export default function Settings({
   projectId,
@@ -107,12 +118,14 @@ export default function Settings({
 
       <Field label={t('settings.scale')} hint={t('settings.scaleHint')}>
         <select
-          value={prefs.uiScale}
-          onChange={(e) => void update({ uiScale: Number(e.target.value) })}
+          value={String(prefs.uiScale)}
+          onChange={(e) =>
+            void update({ uiScale: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })
+          }
         >
           {SCALES.map((scale) => (
-            <option key={scale} value={scale}>
-              {Math.round(scale * 100)}%
+            <option key={String(scale)} value={String(scale)}>
+              {scale === 'auto' ? t('settings.scaleAuto') : `${Math.round(scale * 100)}%`}
             </option>
           ))}
         </select>
