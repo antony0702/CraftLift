@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CraftLift</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CraftLift
+
+   構圖原則：版面由「內容的重要性」決定，不是由 HTML 的書寫順序決定。
+   正在執行的世界佔大版面，關機的縮成一行。詳細頁左右分工——
+   左邊是「這是什麼」，右邊是「正在發生什麼」。
+
+   光：Minecraft 的亮度是離散的 0–15 級，光有斷層。執行中的世界
+   往外散出四階方形硬邊光；關機的是一塊冷石頭。
+
+   橘色的預算只有兩處：光，和主要動作。其餘一律石頭色，讓眼睛有地方休息。
+   ═══════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Cubic 11';
+  src: url('../src/renderer/src/assets/fonts/Cubic_11.woff2') format('woff2');
+  font-display: block;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../src/renderer/src/assets/fonts/JetBrainsMono.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root, :root[data-theme='dark'] {
+  --void:      #0e0b08;
+  --stone-900: #17120d;
+  --stone-800: #1f1913;
+  --stone-700: #2a2219;
+  --edge:      #372c21;
+  --edge-soft: #241d16;
+  --bone:      #f0e6d8;
+  --dust:      #8d7e6c;
+  --torch:     #e07a2f;
+  --torch-hot: #ffc078;
+  --torch-ink: #180a01;
+  --dead-top:   #3d3d3d;
+  --dead-right: #303030;
+  --dead-left:  #242424;
+  --dead-land:  #4a4a4a;
+  --halo-1: rgba(224,122,47,.42);
+  --halo-2: rgba(224,122,47,.20);
+  --halo-3: rgba(224,122,47,.08);
+}
+:root[data-theme='light'] {
+  --void:      #bfb6a5;
+  --stone-900: #d4cdbf;
+  --stone-800: #e2dbd0;
+  --stone-700: #eee8de;
+  --edge:      #a99a84;
+  --edge-soft: #c6bcab;
+  --bone:      #1d1710;
+  --dust:      #6a5e4d;
+  --torch:     #b85e17;
+  --torch-hot: #8a4009;
+  --torch-ink: #fff4e8;
+  --dead-top:   #a8a196;
+  --dead-right: #8d8679;
+  --dead-left:  #746d61;
+  --dead-land:  #b8b1a6;
+  --halo-1: rgba(184,94,23,.45);
+  --halo-2: rgba(184,94,23,.22);
+  --halo-3: rgba(184,94,23,.09);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family: 'Cubic 11', 'Microsoft JhengHei', sans-serif;
+  font-size: 22px;
+  line-height: 33px;
+  -webkit-font-smoothing: none;
+}
+body.smooth { -webkit-font-smoothing: antialiased; }
+
+/* 機器產生的事實用等寬字，人講的話用點陣字。這條規則貫穿全部畫面。 */
+.fact {
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.02em;
+}
+
+.app {
+  max-width: 946px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--stone-900);
+}
+
+/* ── 視窗列 ─────────────────────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: 11px;
+  height: 55px; padding: 0 22px;
+  border-bottom: 1px solid var(--edge-soft);
+}
+.bar .wordmark { font-size: 22px; letter-spacing: .1em; }
+.grow { flex: 1; }
+.icon-btn {
+  width: 33px; height: 33px; display: grid; place-items: center;
+  background: none; border: none; padding: 0; color: var(--dust); cursor: pointer;
+}
+.icon-btn:hover { color: var(--bone); }
+.icon-btn:focus-visible { outline: 2px solid var(--torch); }
+
+/* ── 按鈕 ───────────────────────────────────────────────── */
+button {
+  font-family: inherit; font-size: 22px; line-height: 22px;
+  color: var(--bone); background: transparent;
+  border: 1px solid var(--edge); padding: 11px 22px; cursor: pointer;
+}
+button:hover { background: var(--stone-700); }
+button:focus-visible { outline: 2px solid var(--torch); outline-offset: 2px; }
+button.torch { background: var(--torch); border-color: var(--torch); color: var(--torch-ink); }
+button.torch:hover { background: var(--torch-hot); border-color: var(--torch-hot); }
+button.small { font-size: 11px; line-height: 11px; padding: 9px 14px; }
+button.bare { border-color: transparent; color: var(--dust); padding: 11px 0; }
+button.bare:hover { background: none; color: var(--bone); }
+
+/* ── 世界方塊與光 ───────────────────────────────────────────
+   方形四階硬邊光暈：零模糊、只有擴散的多層陰影。
+   Minecraft 的光在 2D 上就是一圈一圈的方塊。 */
+.world { display: block; line-height: 0; flex-shrink: 0; }
+/* 光不打在空氣裡，而是落在方塊下方的地面上。
+   試過方形光環——硬邊方環套在方形物件外圍，不管多寬多淡都會被
+   讀成相框，那是視知覺的問題，不是參數沒調好。改成不對稱的光池，
+   寬的在上窄的在下，像懸浮的世界照亮腳下，就不可能讀成框了。
+   分階仍然保留：Minecraft 的亮度是離散的。 */
+.stage { display: inline-flex; flex-direction: column; align-items: center; }
+.pool { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; margin-top: -4px; }
+.pool i { display: block; height: 6px; }
+.pool i:nth-child(1) { width: 104%; background: var(--halo-1); }
+.pool i:nth-child(2) { width: 78%;  background: var(--halo-2); }
+.pool i:nth-child(3) { width: 50%;  background: var(--halo-2); }
+.pool i:nth-child(4) { width: 26%;  background: var(--halo-3); }
+
+/* ══════════════════════════════════════════════════════════
+   畫面一：你的世界
+   執行中的世界是主角，佔大版面；關機的縮成一行。
+   ══════════════════════════════════════════════════════════ */
+.screen { padding: 44px; }
+/* 中文字距拉太開會散掉，跟拉丁字不同 */
+.eyebrow {
+  font-size: 11px; line-height: 22px; letter-spacing: .12em;
+  color: var(--dust); margin-bottom: 33px;
+}
+
+/* 主角：不對稱兩欄，左邊是物件，右邊是資訊 */
+.hero { display: flex; align-items: center; gap: 66px; padding: 22px 0 55px; }
+/* stage 的內距要大於光暈的最大擴散，光才有地方化開，不會撞出方形邊界 */
+.hero .stage { padding: 22px 44px; flex-shrink: 0; }
+.hero h1 {
+  margin: 0; font-size: 55px; line-height: 55px;
+  font-weight: normal; letter-spacing: .04em;
+}
+.hero .who { font-size: 22px; color: var(--dust); margin-top: 11px; }
+.hero .who b { color: var(--bone); font-weight: normal; }
+
+/* 位址是要傳給朋友的東西，給它應有的份量 */
+.hero .addr {
+  display: inline-block; margin-top: 33px;
+  font-size: 20px; color: var(--bone);
+  border-bottom: 1px solid var(--edge); padding-bottom: 6px;
+}
+.hero .addr .port { color: var(--dust); }
+.hero .spec { display: block; font-size: 11px; line-height: 22px; color: var(--dust); margin-top: 22px; }
+.hero .acts { display: flex; gap: 11px; margin-top: 33px; }
+
+/* 配角：關機的世界縮成一行 */
+.dormant { border-top: 1px solid var(--edge-soft); }
+.dorm {
+  display: flex; align-items: center; gap: 22px; width: 100%;
+  padding: 22px 0; text-align: left;
+  border: none; border-bottom: 1px solid var(--edge-soft);
+  font-size: 22px; color: var(--bone);
+}
+.dorm:hover { background: var(--stone-800); }
+.dorm .n { flex: 1; }
+.dorm .st { font-size: 11px; color: var(--dust); }
+.dorm .sp { font-size: 11px; color: var(--dust); }
+
+.foot { display: flex; margin-top: 33px; }
+
+/* ══════════════════════════════════════════════════════════
+   畫面二：主控台
+   左欄＝這個世界是什麼，右欄＝正在發生什麼。
+   ══════════════════════════════════════════════════════════ */
+.console { display: grid; grid-template-columns: 253px 1fr; min-height: 495px; }
+.aside {
+  padding: 44px 33px;
+  border-right: 1px solid var(--edge-soft);
+  display: flex; flex-direction: column; gap: 0;
+}
+.aside .stage { align-self: flex-start; margin: 0 0 33px; }
+.aside h2 { margin: 0; font-size: 33px; line-height: 33px; font-weight: normal; letter-spacing: .04em; }
+.aside .who { font-size: 11px; color: var(--dust); margin-top: 6px; }
+.aside .addr { font-size: 15px; margin-top: 33px; color: var(--bone); word-break: break-all; }
+.aside .addr .port { color: var(--dust); }
+.aside dl { margin: 33px 0 0; font-size: 11px; line-height: 22px; }
+.aside dt { color: var(--dust); }
+.aside dd { margin: 0 0 11px; color: var(--bone); }
+.aside .power { margin-top: auto; padding-top: 33px; }
+
+.work { padding: 22px 33px 33px; min-width: 0; }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--edge-soft); margin-bottom: 33px; }
+.tab {
+  font-size: 22px; line-height: 22px; padding: 11px 0 13px;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--dust);
+}
+.tab:hover { background: none; color: var(--bone); }
+.tab[aria-selected='true'] { color: var(--bone); border-bottom-color: var(--bone); }
+
+.roster { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.roster .k { font-size: 11px; color: var(--dust); letter-spacing: .2em; }
+.roster .p { font-size: 13px; }
+
+/* 日誌永遠深色，不跟隨主題：終端機本來就是暗的，
+   長時間盯著淺底深字的日誌明顯比較累。刻意的例外。 */
+.log {
+  background: #14100b; border: 1px solid var(--edge);
+  padding: 14px 16px; height: 231px; overflow: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; line-height: 20px; color: #a2b1a9;
+  white-space: pre-wrap; -webkit-font-smoothing: antialiased;
+}
+.log b { color: #ffc078; font-weight: normal; }
+
+.prompt { display: flex; margin-top: 11px; border: 1px solid var(--edge); }
+.prompt .slash {
+  display: grid; place-items: center; width: 44px; color: var(--dust);
+  font-family: 'JetBrains Mono', monospace; border-right: 1px solid var(--edge);
+}
+.prompt input {
+  flex: 1; min-width: 0; font-family: inherit; font-size: 22px;
+  padding: 11px; background: transparent; border: none; color: var(--bone);
+}
+.prompt input:focus { outline: none; background: var(--stone-800); }
+.prompt input::placeholder { color: var(--dust); }
+.prompt button { border: none; border-left: 1px solid var(--edge); }
+
+/* ══════════════════════════════════════════════════════════
+   空狀態：邀請，不是道歉
+   ══════════════════════════════════════════════════════════ */
+.blank { padding: 88px 44px; text-align: center; }
+.blank .stage { display: inline-block; padding: 33px; margin-bottom: 33px; opacity: .5; }
+.blank p { margin: 0 0 11px; font-size: 33px; }
+.blank .sub { font-size: 11px; color: var(--dust); margin-bottom: 33px; }
+
+/* 等待：逐格四階，跟光同一套語言 */
+.waiting { display: inline-flex; gap: 3px; vertical-align: middle; }
+.waiting i { width: 8px; height: 8px; background: var(--torch); animation: step 1s steps(1) infinite; }
+.waiting i:nth-child(2) { animation-delay: .25s }
+.waiting i:nth-child(3) { animation-delay: .5s }
+.waiting i:nth-child(4) { animation-delay: .75s }
+@keyframes step { 0%,24% { opacity: 1 } 25%,100% { opacity: .18 } }
+@media (prefers-reduced-motion: reduce) { .waiting i { animation: none; opacity: 1 } }
+
+/* ── 技術檢查（不是設計的一部分）───────────────────────────── */
+.check { border-top: 1px solid var(--edge); padding: 33px 44px; background: var(--stone-800); }
+.check h3 { font-size: 11px; color: var(--dust); margin: 0 0 22px; font-weight: normal; letter-spacing: .3em; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
+.s11 { font-size: 11px; line-height: 22px }
+.s22 { font-size: 22px; line-height: 33px }
+.s33 { font-size: 33px; line-height: 44px }
+.s44 { font-size: 44px; line-height: 55px }
+.off { font-size: 15px; line-height: 24px; color: var(--torch) }
+.sep { height: 1px; background: var(--edge-soft); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ════════ 視窗列 ════════ -->
+  <div class="bar">
+    <svg width="22" height="22" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
+      <path d="M16 4 L30 12 L16 20 L2 12 Z" fill="#2b6c9e"/>
+      <path d="M2 12 L16 20 L16 30 L2 22 Z" fill="#123047"/>
+      <path d="M30 12 L16 20 L16 30 L30 22 Z" fill="#1b4a6b"/>
+      <g fill="#5e8c4a"><rect x="10" y="10" width="6" height="1"/><rect x="18" y="12" width="5" height="1"/></g>
+      <g fill="#e07a2f"><rect x="6" y="24" width="9" height="2"/><rect x="17" y="24" width="9" height="2"/></g>
+    </svg>
+    <span class="wordmark">CRAFTLIFT</span>
+    <div class="grow"></div>
+    <button class="icon-btn" onclick="setTheme('light')" title="淺色"><svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor"><rect x="6" y="6" width="4" height="4"/><rect x="7" y="2" width="2" height="2"/><rect x="7" y="12" width="2" height="2"/><rect x="2" y="7" width="2" height="2"/><rect x="12" y="7" width="2" height="2"/></svg></button>
+    <button class="icon-btn" onclick="setTheme('dark')" title="深色"><svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor"><path d="M9 2h4v2h-2v2h-2v4h2v2h2v2H9v-2H7v-2H5V6h2V4h2z"/></svg></button>
+    <button class="icon-btn" onclick="setTheme(null)" title="跟隨系統"><svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor"><rect x="2" y="3" width="12" height="8"/><rect x="6" y="12" width="4" height="1"/></svg></button>
+    <button class="icon-btn" title="偏好設定">
+      <svg width="18" height="18" viewBox="0 0 18 18" shape-rendering="crispEdges" fill="currentColor">
+        <rect x="7" y="1" width="4" height="2"/><rect x="7" y="15" width="4" height="2"/>
+        <rect x="1" y="7" width="2" height="4"/><rect x="15" y="7" width="2" height="4"/>
+        <rect x="3" y="3" width="2" height="2"/><rect x="13" y="3" width="2" height="2"/>
+        <rect x="3" y="13" width="2" height="2"/><rect x="13" y="13" width="2" height="2"/>
+        <rect x="5" y="5" width="8" height="8"/>
+        <rect x="7" y="7" width="4" height="4" fill="var(--stone-900)"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ════════ 畫面一：你的世界 ════════ -->
+  <div class="screen">
+    <div class="eyebrow">你的世界</div>
+
+    <div class="hero">
+      <span class="stage">
+        <span class="world lit">
+          <svg width="132" height="132" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
+            <defs>
+              <clipPath id="aL"><path d="M2 12 L16 20 L16 30 L2 22 Z"/></clipPath>
+              <clipPath id="aR"><path d="M30 12 L16 20 L16 30 L30 22 Z"/></clipPath>
+              <clipPath id="aT"><path d="M16 4 L30 12 L16 20 L2 12 Z"/></clipPath>
+            </defs>
+            <g clip-path="url(#aL)">
+              <rect x="0" y="12" width="16" height="6" fill="#123047"/>
+              <rect x="0" y="18" width="16" height="6" fill="#241c14"/>
+              <rect x="0" y="24" width="16" height="3" fill="#8a3a10"/>
+              <rect x="0" y="27" width="16" height="4" fill="#e07a2f"/>
+            </g>
+            <g clip-path="url(#aR)">
+              <rect x="16" y="12" width="16" height="6" fill="#1b4a6b"/>
+              <rect x="16" y="18" width="16" height="6" fill="#382b1e"/>
+              <rect x="16" y="24" width="16" height="3" fill="#b0561a"/>
+              <rect x="16" y="27" width="16" height="4" fill="#ffc078"/>
+            </g>
+            <g clip-path="url(#aT)">
+              <rect x="0" y="0" width="32" height="32" fill="#2b6c9e"/>
+              <g fill="#5e8c4a">
+                <rect x="9" y="9" width="5" height="1"/><rect x="8" y="10" width="8" height="1"/>
+                <rect x="9" y="11" width="6" height="1"/><rect x="11" y="12" width="3" height="1"/>
+                <rect x="18" y="11" width="6" height="1"/><rect x="17" y="12" width="8" height="1"/>
+                <rect x="19" y="13" width="5" height="1"/><rect x="14" y="16" width="5" height="1"/>
+              </g>
+              <rect x="0" y="4" width="32" height="1" fill="#4d90c0" opacity=".55"/>
+            </g>
+          </svg>
+        </span>
+        <span class="pool" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </span>
+
+      <div>
+        <h1>生存服</h1>
+        <div class="who"><b>Steve</b>、<b>Alex</b>、<b>Notch</b> 在裡面</div>
+        <div class="addr fact">203.0.113.42<span class="port">:25565</span></div>
+        <span class="spec fact">1.21.4 · e2-standard-2 · 8 GB · asia-east1-b</span>
+        <div class="acts">
+          <button class="torch">進入管理</button>
+          <button>關機</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dormant">
+      <button class="dorm">
+        <span class="world">
+          <svg width="44" height="44" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
+            <defs>
+              <clipPath id="bL"><path d="M2 12 L16 20 L16 30 L2 22 Z"/></clipPath>
+              <clipPath id="bR"><path d="M30 12 L16 20 L16 30 L30 22 Z"/></clipPath>
+              <clipPath id="bT"><path d="M16 4 L30 12 L16 20 L2 12 Z"/></clipPath>
+            </defs>
+            <g clip-path="url(#bL)"><rect x="0" y="12" width="16" height="19" fill="var(--dead-left)"/></g>
+            <g clip-path="url(#bR)"><rect x="16" y="12" width="16" height="19" fill="var(--dead-right)"/></g>
+            <g clip-path="url(#bT)">
+              <rect x="0" y="0" width="32" height="32" fill="var(--dead-top)"/>
+              <g fill="var(--dead-land)"><rect x="10" y="10" width="6" height="1"/><rect x="18" y="12" width="5" height="1"/></g>
+            </g>
+          </svg>
+        </span>
+        <span class="n">創造服</span>
+        <span class="sp fact">1.21.4 · e2-medium · 4 GB</span>
+        <span class="st">已關機</span>
+      </button>
+    </div>
+
+    <div class="foot"><button class="torch">開一個新世界</button></div>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- ════════ 畫面二：主控台 ════════ -->
+  <div class="console">
+    <div class="aside">
+      <span class="stage">
+        <span class="world lit">
+          <svg width="66" height="66" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
+            <defs>
+              <clipPath id="cL"><path d="M2 12 L16 20 L16 30 L2 22 Z"/></clipPath>
+              <clipPath id="cR"><path d="M30 12 L16 20 L16 30 L30 22 Z"/></clipPath>
+              <clipPath id="cT"><path d="M16 4 L30 12 L16 20 L2 12 Z"/></clipPath>
+            </defs>
+            <g clip-path="url(#cL)">
+              <rect x="0" y="12" width="16" height="6" fill="#123047"/><rect x="0" y="18" width="16" height="6" fill="#241c14"/>
+              <rect x="0" y="24" width="16" height="7" fill="#e07a2f"/>
+            </g>
+            <g clip-path="url(#cR)">
+              <rect x="16" y="12" width="16" height="6" fill="#1b4a6b"/><rect x="16" y="18" width="16" height="6" fill="#382b1e"/>
+              <rect x="16" y="24" width="16" height="7" fill="#ffc078"/>
+            </g>
+            <g clip-path="url(#cT)">
+              <rect x="0" y="0" width="32" height="32" fill="#2b6c9e"/>
+              <g fill="#5e8c4a"><rect x="9" y="10" width="7" height="1"/><rect x="18" y="12" width="6" height="1"/><rect x="14" y="16" width="4" height="1"/></g>
+            </g>
+          </svg>
+        </span>
+        <span class="pool" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </span>
+
+      <h2>生存服</h2>
+      <div class="who">3 人在裡面</div>
+      <div class="addr fact">203.0.113.42<span class="port">:25565</span></div>
+
+      <dl>
+        <dt>版本</dt><dd class="fact">1.21.4</dd>
+        <dt>機器</dt><dd class="fact">e2-standard-2 · 8 GB</dd>
+        <dt>機房</dt><dd class="fact">asia-east1-b</dd>
+      </dl>
+
+      <div class="power"><button>關機</button></div>
+    </div>
+
+    <div class="work">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">主控台</button>
+        <button class="tab" role="tab" aria-selected="false">設定</button>
+        <button class="tab" role="tab" aria-selected="false">玩家</button>
+        <button class="tab" role="tab" aria-selected="false">檔案</button>
+        <button class="tab" role="tab" aria-selected="false">備份</button>
+      </div>
+
+      <div class="roster">
+        <span class="k">在裡面的人</span>
+        <span class="p fact">Steve</span><span class="p fact">Alex</span><span class="p fact">Notch</span>
+      </div>
+
+      <div class="log">[22:53:01] Starting minecraft server version 1.21.4
+[22:53:01] Loading properties
+[22:53:01] Preparing level "world"
+[22:53:19] Preparing spawn area: 100%
+[22:53:19] Done (17.430s)! For help, type "help"
+[22:53:19] RCON running on 0.0.0.0:25575
+<b>[22:54:19] Can't keep up! Is the server overloaded?</b>
+[22:55:02] Steve joined the game
+[22:55:14] Alex joined the game
+[22:56:40] Notch joined the game</div>
+
+      <div class="prompt">
+        <span class="slash fact">/</span>
+        <input type="text" placeholder="輸入指令，例如 time set day" />
+        <button class="torch">送出</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- ════════ 空狀態 ════════ -->
+  <div class="blank">
+    <span class="stage">
+      <span class="world">
+        <svg width="88" height="88" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">
+          <defs>
+            <clipPath id="dL"><path d="M2 12 L16 20 L16 30 L2 22 Z"/></clipPath>
+            <clipPath id="dR"><path d="M30 12 L16 20 L16 30 L30 22 Z"/></clipPath>
+            <clipPath id="dT"><path d="M16 4 L30 12 L16 20 L2 12 Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#dL)"><rect x="0" y="12" width="16" height="19" fill="var(--dead-left)"/></g>
+          <g clip-path="url(#dR)"><rect x="16" y="12" width="16" height="19" fill="var(--dead-right)"/></g>
+          <g clip-path="url(#dT)"><rect x="0" y="0" width="32" height="32" fill="var(--dead-top)"/></g>
+        </svg>
+      </span>
+    </span>
+    <p>這裡還沒有世界。</p>
+    <div class="sub">開一個，把位址給朋友，就可以一起玩了。</div>
+    <button class="torch">開一個新世界</button>
+    <div style="margin-top:44px;font-size:11px;color:var(--dust)">
+      正在建立世界，大約還要三分鐘 <span class="waiting"><i></i><i></i><i></i><i></i></span>
+    </div>
+  </div>
+
+  <!-- ════════ 技術檢查 ════════ -->
+  <div class="check">
+    <h3>技術檢查 · 字體渲染</h3>
+    <div class="grid2">
+      <div>
+        <div class="s11">11px　線上 3 / 10 人　備份完成</div>
+        <div class="s22">22px　開一個新世界</div>
+        <div class="s33">33px　生存服</div>
+        <div class="s44">44px　你的世界</div>
+      </div>
+      <div>
+        <div class="s11" style="color:var(--dust)">↓ 15px，刻意不對齊 11 的倍數</div>
+        <div class="off">15px　這一行應該明顯比較糊</div>
+        <div class="s11 fact" style="margin-top:22px;color:var(--dust)">等寬字 12px · JetBrains Mono</div>
+        <div class="fact" style="font-size:12px;line-height:20px">203.0.113.42:25565　$68.94　1.21.4</div>
+        <div style="margin-top:22px"><button class="small" onclick="document.body.classList.toggle('smooth')">切換字體平滑</button></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+function setTheme(t) {
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+}
+</script>
+</body>
+</html>
