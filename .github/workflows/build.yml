@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: 取得原始碼
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 設定 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -39,8 +39,13 @@ jobs:
       - name: 型別檢查
         run: npm run typecheck
 
+      # 這裡刻意不用 npm run build:win，而是分成兩步並明確加上 --publish never。
+      # 原因：electron-builder 偵測到自己跑在 CI 環境時，會自作主張把產物發佈到
+      # GitHub Releases，沒給權杖就整個建置失敗。我們只要產物，發佈由人決定。
       - name: 建置 Windows 安裝檔
-        run: npm run build:win
+        run: |
+          npm run build
+          npx electron-builder --win --publish never
 
       # 產生校驗碼讓使用者能驗證下載到的檔案沒有被竄改。
       # 因為我們沒有程式碼簽章，這是使用者唯一能驗證來源的方法。
