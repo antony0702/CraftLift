@@ -259,9 +259,7 @@ export default {
     theme: '介面配色',
     themes: { system: '跟隨系統', light: '淺色', dark: '深色' },
     scale: '介面大小',
-    scaleHint:
-      '整體放大縮小介面。標示 ✦ 的倍率下，點陣字的每個像素剛好對齊螢幕格點，字最銳利；其餘倍率會讓字略微變糊，但如果你覺得預設太小，那是值得的取捨。',
-    scaleCrisp: '✦ 代表這個倍率下字體最銳利。',
+    scaleHint: '整體放大縮小介面，包含文字、間距與圖示。改完立即生效，不需要重新啟動。',
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:

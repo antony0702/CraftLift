@@ -273,9 +273,7 @@ export default {
     theme: 'Appearance',
     themes: { system: 'Match system', light: 'Light', dark: 'Dark' },
     scale: 'Interface size',
-    scaleHint:
-      'Scales the whole interface. At the sizes marked ✦ every pixel of the bitmap font lands exactly on a screen pixel, so text is sharpest. Other sizes soften it slightly — worth it if the default is too small for you.',
-    scaleCrisp: '✦ marks the sizes where text stays sharpest.',
+    scaleHint: 'Scales the whole interface — text, spacing and icons. Takes effect immediately.',
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:

@@ -12,12 +12,11 @@ const THEMES: ThemeChoice[] = ['system', 'light', 'dark']
 /**
  * 介面縮放的可選倍率。
  *
- * 只有 1 與 2 對點陣字是精準的（11px → 22px），1.25 與 1.5 會讓字落在
- * 非整數位置而略微變糊。仍然列出來，是因為 11px 對部分使用者確實太小，
- * 糊一點好過看不清楚——但 UI 上會標明哪些是銳利的。
+ * 級距刻意做細（5%）。100% 的 11px 偏小、125% 又過大，舒服的點就落在
+ * 中間那一段，級距太粗會找不到。非 11 倍數的倍率會讓點陣字略微變糊，
+ * 但實測觀感影響很小，遠不如字太小來得難用。
  */
-const SCALES = [1, 1.25, 1.5, 2]
-const CRISP = [1, 2]
+const SCALES = [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.35, 1.5, 1.75, 2]
 
 export default function Settings({
   projectId,
@@ -107,20 +106,17 @@ export default function Settings({
       </Field>
 
       <Field label={t('settings.scale')} hint={t('settings.scaleHint')}>
-        <div className="segmented">
+        <select
+          value={prefs.uiScale}
+          onChange={(e) => void update({ uiScale: Number(e.target.value) })}
+        >
           {SCALES.map((scale) => (
-            <button
-              key={scale}
-              type="button"
-              aria-pressed={prefs.uiScale === scale}
-              onClick={() => void update({ uiScale: scale })}
-            >
-              {Math.round(scale * 100)}%{CRISP.includes(scale) ? ' ✦' : ''}
-            </button>
+            <option key={scale} value={scale}>
+              {Math.round(scale * 100)}%
+            </option>
           ))}
-        </div>
+        </select>
       </Field>
-      <p className="muted small">{t('settings.scaleCrisp')}</p>
 
       <Field label={t('settings.language')}>
         <select value={prefs.language} onChange={(e) => void update({ language: e.target.value })}>
