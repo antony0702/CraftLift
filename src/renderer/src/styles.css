@@ -80,8 +80,10 @@ body {
   background: var(--stone-900);
   color: var(--bone);
   font-family: 'Cubic 11', 'Microsoft JhengHei', sans-serif;
-  font-size: 22px;
-  line-height: 33px;
+  /* 11px 是這套點陣字的原生尺寸。22px 以上只用於強調與標題——
+     整個介面都用 22px 會大得像簡報，那是先前的錯誤。 */
+  font-size: 11px;
+  line-height: 22px;
   /* 點陣字關掉次像素平滑才銳利 */
   -webkit-font-smoothing: none;
   user-select: none;
@@ -104,12 +106,12 @@ h3 {
   letter-spacing: 0.04em;
 }
 h1 {
-  font-size: 55px;
-  line-height: 55px;
-}
-h2 {
   font-size: 33px;
   line-height: 44px;
+}
+h2 {
+  font-size: 22px;
+  line-height: 33px;
 }
 h3 {
   font-size: 22px;
@@ -124,6 +126,11 @@ p {
 .small {
   font-size: 11px;
   line-height: 22px;
+}
+/* 需要強調的內文 */
+.lead {
+  font-size: 22px;
+  line-height: 33px;
 }
 .grow {
   flex: 1;
@@ -151,7 +158,7 @@ input,
 select,
 textarea {
   font-family: inherit;
-  font-size: 22px;
+  font-size: 11px;
   line-height: 22px;
   padding: 11px;
   width: 100%;
@@ -190,12 +197,12 @@ input::placeholder {
   gap: 11px;
   margin: 11px 0;
   cursor: pointer;
-  font-size: 22px;
-  line-height: 33px;
+  font-size: 11px;
+  line-height: 22px;
 }
 .checkbox input {
   width: auto;
-  margin-top: 8px;
+  margin-top: 4px;
   flex-shrink: 0;
   accent-color: var(--torch);
 }
@@ -211,7 +218,7 @@ input::placeholder {
 /* ── 按鈕 ───────────────────────────────────────────────────── */
 button {
   font-family: inherit;
-  font-size: 22px;
+  font-size: 11px;
   line-height: 22px;
   color: var(--bone);
   background: transparent;
@@ -289,10 +296,12 @@ button.danger:hover:not(:disabled) {
   flex-wrap: wrap;
 }
 
-/* ── 外框與視窗列 ───────────────────────────────────────────── */
+/* ── 外框與視窗列 ─────────────────────────────────────────────
+   版面完全流動：內容跟著視窗填滿，不留死白。
+   字級不隨視窗縮放——點陣字只在 11 的倍數下銳利，平滑縮放會讓它糊掉。
+   要整體放大縮小請用設定裡的「介面大小」，那走的是對點陣字友善的級距。 */
 .app {
-  max-width: 946px;
-  margin: 0 auto;
+  width: 100%;
   min-height: 100vh;
   background: var(--stone-900);
 }
@@ -319,10 +328,11 @@ button.danger:hover:not(:disabled) {
   background: none;
 }
 .screen {
-  padding: 44px;
+  padding: 33px 44px 44px;
 }
+/* 讀起來舒服的行長有上限，所以表單類畫面仍然限寬並置中 */
 .screen.narrow {
-  max-width: 616px;
+  max-width: 682px;
   margin: 0 auto;
 }
 .sep {
@@ -378,13 +388,14 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 66px;
-  padding: 22px 0 55px;
+  padding: 22px 0 44px;
+  flex-wrap: wrap;
 }
 .hero .stage {
   padding: 22px 44px;
 }
 .hero .who {
-  font-size: 22px;
+  font-size: 11px;
   color: var(--dust);
   margin-top: 11px;
 }
@@ -394,8 +405,8 @@ button.danger:hover:not(:disabled) {
 }
 .hero .addr {
   display: inline-block;
-  margin-top: 33px;
-  font-size: 20px;
+  margin-top: 22px;
+  font-size: 15px;
   color: var(--bone);
   border-bottom: 1px solid var(--edge);
   padding-bottom: 6px;
@@ -435,7 +446,7 @@ button.danger:hover:not(:disabled) {
   text-align: left;
   border: none;
   border-bottom: 1px solid var(--edge-soft);
-  font-size: 22px;
+  font-size: 11px;
 }
 .dorm:first-child {
   border-top: 1px solid var(--edge-soft);
@@ -449,11 +460,44 @@ button.danger:hover:not(:disabled) {
   color: var(--dust);
 }
 
+@media (max-width: 620px) {
+  .screen {
+    padding: 22px;
+  }
+  .hero {
+    gap: 22px;
+  }
+  .hero .stage {
+    padding: 11px;
+  }
+  .tiers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .figures {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+  }
+  /* 關機的世界在窄視窗下把規格藏起來，留下名稱與狀態就好 */
+  .dorm .sp {
+    display: none;
+  }
+}
+
 /* ── 主控台：左欄是什麼，右欄正在發生什麼 ──────────────────── */
 .console {
   display: grid;
-  grid-template-columns: 264px 1fr;
+  grid-template-columns: 264px minmax(0, 1fr);
   align-items: start;
+}
+/* 視窗太窄時左右兩欄疊成上下，右欄的日誌才不會被擠到不能看 */
+@media (max-width: 780px) {
+  .console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aside {
+    border-right: none;
+    border-bottom: 1px solid var(--edge-soft);
+  }
 }
 .aside {
   padding: 33px;
@@ -506,7 +550,7 @@ button.danger:hover:not(:disabled) {
   flex-wrap: wrap;
 }
 .tab {
-  font-size: 22px;
+  font-size: 11px;
   line-height: 22px;
   padding: 11px 0 13px;
   background: none;
@@ -581,7 +625,7 @@ button.danger:hover:not(:disabled) {
   background: #14100b;
   border: 1px solid var(--edge);
   padding: 14px 16px;
-  height: 330px;
+  height: clamp(220px, 42vh, 560px);
   overflow: auto;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
@@ -612,6 +656,7 @@ button.danger:hover:not(:disabled) {
   min-width: 0;
   background: transparent;
   border: none;
+  font-size: 11px;
 }
 .prompt input:focus {
   outline: none;
@@ -701,8 +746,8 @@ button.danger:hover:not(:disabled) {
   opacity: 0.5;
 }
 .blank p {
-  font-size: 33px;
-  line-height: 44px;
+  font-size: 22px;
+  line-height: 33px;
 }
 .disclaimer {
   border: 1px solid var(--edge);
@@ -730,6 +775,7 @@ button.danger:hover:not(:disabled) {
 .tier b {
   font-size: 22px;
   font-weight: normal;
+  line-height: 33px;
 }
 .tier .spec {
   font-size: 11px;
@@ -773,8 +819,8 @@ button.danger:hover:not(:disabled) {
   flex-direction: column;
 }
 .figures b {
-  font-size: 33px;
-  line-height: 44px;
+  font-size: 22px;
+  line-height: 33px;
   font-weight: normal;
   color: var(--torch-hot);
   font-family: 'JetBrains Mono', monospace;
@@ -851,7 +897,7 @@ button.danger:hover:not(:disabled) {
   margin-bottom: 11px;
 }
 .editor {
-  height: 396px;
+  height: clamp(240px, 46vh, 600px);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 20px;

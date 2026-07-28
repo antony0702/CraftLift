@@ -6,6 +6,7 @@ import type { Preferences } from '@shared/types'
 const DEFAULTS: Preferences = {
   language: 'zh-TW',
   theme: 'system',
+  uiScale: 1,
   // 預設開啟。「試用到期前 7 天自動備份到本機」只有在 CraftLift 有在執行時
   // 才可能發生，關掉這個選項等於讓那道保護失效。
   launchAtLogin: true,

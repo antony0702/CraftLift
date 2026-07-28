@@ -9,6 +9,16 @@ import { supportedLanguages } from '../i18n'
 
 const THEMES: ThemeChoice[] = ['system', 'light', 'dark']
 
+/**
+ * 介面縮放的可選倍率。
+ *
+ * 只有 1 與 2 對點陣字是精準的（11px → 22px），1.25 與 1.5 會讓字落在
+ * 非整數位置而略微變糊。仍然列出來，是因為 11px 對部分使用者確實太小，
+ * 糊一點好過看不清楚——但 UI 上會標明哪些是銳利的。
+ */
+const SCALES = [1, 1.25, 1.5, 2]
+const CRISP = [1, 2]
+
 export default function Settings({
   projectId,
   onBack,
@@ -95,6 +105,22 @@ export default function Settings({
           ))}
         </div>
       </Field>
+
+      <Field label={t('settings.scale')} hint={t('settings.scaleHint')}>
+        <div className="segmented">
+          {SCALES.map((scale) => (
+            <button
+              key={scale}
+              type="button"
+              aria-pressed={prefs.uiScale === scale}
+              onClick={() => void update({ uiScale: scale })}
+            >
+              {Math.round(scale * 100)}%{CRISP.includes(scale) ? ' ✦' : ''}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <p className="muted small">{t('settings.scaleCrisp')}</p>
 
       <Field label={t('settings.language')}>
         <select value={prefs.language} onChange={(e) => void update({ language: e.target.value })}>

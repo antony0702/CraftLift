@@ -321,9 +321,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   // --- 偏好設定與雜項 -------------------------------------------------------
   handle('prefs:get', getPreferences)
-  handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> =>
-    setPreferences(updates)
-  )
+  handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> => {
+    const next = await setPreferences(updates)
+    // 縮放要由主行程套用：畫面跑在沙箱裡，拿不到 webFrame。
+    if (updates.uiScale !== undefined) {
+      getWindow()?.webContents.setZoomFactor(next.uiScale)
+    }
+    return next
+  })
 
   /** 目前實際採用的配色。設定為「跟隨系統」時，這裡回傳解析後的結果。 */
   handle('theme:effective', async (): Promise<'light' | 'dark'> => effectiveTheme())

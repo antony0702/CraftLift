@@ -39,6 +39,11 @@ function createWindow(show = true): void {
 
   mainWindow.on('ready-to-show', () => {
     if (show) mainWindow?.show()
+    // 套用使用者設定的介面縮放。畫面跑在沙箱裡拿不到 webFrame，
+    // 所以縮放一律由主行程設定。
+    void getPreferences().then((prefs) => {
+      mainWindow?.webContents.setZoomFactor(prefs.uiScale)
+    })
   })
 
   /**

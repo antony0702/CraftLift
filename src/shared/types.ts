@@ -154,6 +154,14 @@ export interface Preferences {
   language: string
   /** 使用者選的配色。實際採用哪一套要看 system 解析後的結果。 */
   theme: ThemeChoice
+  /**
+   * 介面整體縮放倍率。
+   *
+   * 只有 1 與 2 對點陣字是精準的（11px → 22px）；1.25 與 1.5 會讓字
+   * 落在非整數位置而略微變糊。仍然提供，是因為 11px 對部分使用者
+   * 確實太小，糊一點也好過看不清楚——但預設維持在銳利的 1。
+   */
+  uiScale: number
   /** 開機自動啟動。預設開啟，因為「到期前自動備份」需要 app 有在跑才能生效。 */
   launchAtLogin: boolean
   /** VM 上自動備份的間隔（小時） */
