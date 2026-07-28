@@ -838,25 +838,41 @@ button.danger:hover:not(:disabled) {
 }
 
 /* ── 說明泡泡 ───────────────────────────────────────────────── */
+/* 「i」會掉出方框，原因是它繼承了 body 的 line-height: 22px——
+   22px 的行框塞在 14px 的盒子裡，字自然被推到底部甚至溢位。
+   line-height: 1 讓行框收合到字身高度，才置中得起來。
+   泡泡本身另外指定行高，不受這裡影響。 */
 .info {
   position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 14px;
-  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  line-height: 1;
+  font-size: 11px;
+  /* 行內使用時（例如夾在核取方塊的文字中）跟周圍文字的視覺中線對齊 */
+  vertical-align: -3px;
   border: 1px solid var(--dust);
   color: var(--dust);
-  font-size: 11px;
   cursor: help;
   flex-shrink: 0;
+  user-select: none;
 }
+.info:hover,
+.info:focus-visible {
+  border-color: var(--bone);
+  color: var(--bone);
+}
+/* 泡泡從圖示左緣往右展開，不置中。
+   info 圖示幾乎都貼在欄位標籤的左側，置中展開會讓一半跑到視窗外被切掉。 */
 .info span {
   display: none;
   position: absolute;
-  bottom: 140%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 275px;
+  bottom: 150%;
+  left: -4px;
+  width: max-content;
+  max-width: 297px;
   padding: 11px;
   background: var(--stone-700);
   border: 1px solid var(--edge);
