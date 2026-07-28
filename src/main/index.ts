@@ -1,13 +1,8 @@
 import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { registerIpcHandlers } from './ipc'
-import {
-  applyLaunchAtLogin,
-  applyTheme,
-  autoScaleFor,
-  effectiveTheme,
-  getPreferences
-} from './preferences'
+import { applyLaunchAtLogin, applyTheme, effectiveTheme, getPreferences } from './preferences'
+import { applyZoom, bindZoomTarget } from './zoom'
 import { closeAllConnections } from './server/ssh'
 
 /**
@@ -43,24 +38,41 @@ function createWindow(show = true): void {
     }
   })
 
+  bindZoomTarget(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     if (show) mainWindow?.show()
-    void applyZoom()
+    // 設定檔載入後才有縮放倍率可用；applyZoom 本身是同步的
+    void getPreferences().then(() => applyZoom())
   })
 
   /**
    * 視窗大小改變時重算縮放。
    *
-   * 拖曳邊框時 resize 會連續觸發上百次，每次都設定縮放會讓畫面抖動，
-   * 所以延遲到停手之後再套用。
+   * 用節流而不是防抖。防抖會在拖曳期間一直重置計時器，整個過程都不
+   * 套用縮放，放手後才跳一階——看起來就是「拉到某個程度突然變大變小」。
+   * 節流則是拖曳過程中持續套用，只限制頻率。
+   *
+   * 32 毫秒約等於每秒三十次，肉眼看起來是連續的，同時把整頁重排的
+   * 次數壓在合理範圍。尾端再補一次，確保停手時的尺寸一定正確。
    *
    * 注意：setZoomFactor 不會反過來改變 getContentSize 回傳的值
    * （那是與縮放無關的邏輯像素），所以這裡不會形成迴圈。
    */
-  let resizeTimer: NodeJS.Timeout | null = null
+  let lastApplied = 0
+  let trailing: NodeJS.Timeout | null = null
   mainWindow.on('resize', () => {
-    if (resizeTimer) clearTimeout(resizeTimer)
-    resizeTimer = setTimeout(() => void applyZoom(), 80)
+    const now = Date.now()
+    if (now - lastApplied >= 32) {
+      lastApplied = now
+      applyZoom()
+      return
+    }
+    if (trailing) clearTimeout(trailing)
+    trailing = setTimeout(() => {
+      lastApplied = Date.now()
+      applyZoom()
+    }, 32)
   })
 
   /**
@@ -89,28 +101,6 @@ function createWindow(show = true): void {
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-}
-
-/**
- * 套用介面縮放。
- *
- * 縮放必須由主行程設定：畫面跑在沙箱裡，拿不到 webFrame。
- * 設定為 'auto' 時依視窗大小換算，否則用使用者指定的固定倍率。
- */
-/** 上次實際套用的縮放。相同就不重設，避免無謂的整頁重排。 */
-let appliedZoom = 0
-
-async function applyZoom(): Promise<void> {
-  if (!mainWindow) return
-  const prefs = await getPreferences()
-  const [width, height] = mainWindow.getContentSize()
-  const factor = prefs.uiScale === 'auto' ? autoScaleFor(width, height) : prefs.uiScale
-
-  // setZoomFactor 會強制整頁重新排版與重繪。拖曳視窗邊框時，縮放值
-  // 四捨五入到小數兩位後其實常常沒變，這時再設一次只是白白讓畫面頓一下。
-  if (factor === appliedZoom) return
-  appliedZoom = factor
-  mainWindow.webContents.setZoomFactor(factor)
 }
 
 function showWindow(): void {

@@ -22,6 +22,17 @@ function filePath(): string {
 
 let cache: Preferences | null = null
 
+/**
+ * 同步取得已載入的偏好設定。
+ *
+ * 視窗 resize 每秒會觸發上百次，處理函式必須是同步的——每次都 await
+ * 一個 Promise 會讓縮放慢半拍，拖曳時就看得出延遲。設定檔載入後就
+ * 一直在記憶體裡，這裡直接讀它。尚未載入時回傳 null，呼叫端跳過即可。
+ */
+export function getCachedPreferences(): Preferences | null {
+  return cache
+}
+
 export async function getPreferences(): Promise<Preferences> {
   if (cache) return cache
   try {

@@ -16,6 +16,7 @@ import type {
   ServerProperties
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
+import { applyZoom } from './zoom'
 import { getGcloudStatus } from './gcloud/exec'
 import { getAuthStatus, login } from './gcloud/auth'
 import {
@@ -41,7 +42,6 @@ import { closeAllConnections, closeConnection, getConnection } from './server/ss
 import type { ServerConnection } from './server/ssh'
 import * as ops from './server/operations'
 import {
-  autoScaleFor,
   defaultLocalBackupDir,
   effectiveTheme,
   getPreferences,
@@ -348,17 +348,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('prefs:get', getPreferences)
   handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> => {
     const next = await setPreferences(updates)
-    // 縮放要由主行程套用：畫面跑在沙箱裡拿不到 webFrame。
-    // 這裡就地計算而非呼叫 index.ts 的函式，避免兩個模組互相匯入。
-    if (updates.uiScale !== undefined) {
-      const window = getWindow()
-      if (window) {
-        const [w, h] = window.getContentSize()
-        window.webContents.setZoomFactor(
-          next.uiScale === 'auto' ? autoScaleFor(w, h) : next.uiScale
-        )
-      }
-    }
+    if (updates.uiScale !== undefined) applyZoom()
     return next
   })
 
