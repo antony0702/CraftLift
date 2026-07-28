@@ -60,7 +60,7 @@ jobs:
           }
 
       - name: 上傳建置產物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: CraftLift-Windows
           path: |
