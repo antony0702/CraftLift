@@ -3,13 +3,29 @@ export default {
     name: 'CraftLift',
     tagline: 'Host your own Minecraft server on Google Cloud'
   },
+  nav: { settings: 'Settings' },
+  common: {
+    error: 'Something went wrong',
+    retry: 'Retry',
+    copied: 'Copied',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving…',
+    delete: 'Delete',
+    back: 'Back',
+    refresh: 'Refresh'
+  },
+  state: {
+    PROVISIONING: 'Provisioning',
+    STAGING: 'Starting',
+    RUNNING: 'Running',
+    STOPPING: 'Stopping',
+    TERMINATED: 'Stopped',
+    SUSPENDED: 'Suspended',
+    UNKNOWN: 'Unknown'
+  },
   setup: {
     checking: 'Checking your environment…',
-    steps: {
-      environment: 'Environment',
-      account: 'Sign in',
-      server: 'Create server'
-    },
     gcloudMissing: {
       title: 'Google Cloud CLI is required',
       desc: 'CraftLift drives your cloud account through Google’s official command-line tool. This way the sign-in flow never shows an “unverified app” warning, and there is no cap on how many people can use CraftLift.',
@@ -17,10 +33,6 @@ export default {
       afterInstall: 'Once it finishes, restart CraftLift so it can pick up the newly installed tool.',
       download: 'Or visit the official download page',
       recheck: 'I’ve installed it — check again'
-    },
-    gcloudReady: {
-      title: 'Environment ready',
-      version: 'Version {{version}}'
     },
     login: {
       title: 'Sign in with Google',
@@ -30,15 +42,219 @@ export default {
       waitingHint:
         'This screen continues automatically once you approve. If you closed the browser by accident, just press sign in again.'
     },
-    loggedIn: {
-      title: 'Signed in',
-      next: 'Next: create a server',
-      comingSoon: '(Server creation is still under construction)'
+    noBilling: {
+      title: 'No billing account available yet',
+      desc: 'Your Google account has not activated Google Cloud yet. You have to do this yourself in a browser — no application can do it for you.',
+      point1: 'Google gives new accounts $300 of credit, valid for 90 days. Whichever runs out first ends the trial.',
+      point2: 'Activation needs a credit card for identity verification. CraftLift never sees your card number.',
+      point3: 'Google does not charge you automatically when the credit or the 90 days run out — you have to manually upgrade to a paid account before anything is billed.',
+      open: 'Open Google Cloud sign-up',
+      recheck: 'I’ve activated it — check again'
+    },
+    billing: {
+      title: 'Preparing your cloud environment',
+      signedInAs: 'Signed in as',
+      select: 'Choose a billing account',
+      whatHappens:
+        'CraftLift creates a dedicated Google Cloud project for your servers. Everything lives inside it, so when you want to shut it all down, deleting that one project is guaranteed to leave nothing behind that could bill you. A budget alert is also set up so Google emails you directly as spending approaches the limit.',
+      continue: 'Create project and continue',
+      preparing: 'Preparing your cloud environment…',
+      preparingHint:
+        'Creating the project, linking billing, enabling the required services. The first run can take a minute or two.'
     }
   },
-  common: {
-    error: 'Something went wrong',
-    retry: 'Retry',
-    copied: 'Copied'
+  list: {
+    loading: 'Loading your servers…',
+    title: 'My servers',
+    create: 'New server',
+    empty: 'No servers yet',
+    emptyHint: 'Press “New server” in the top right to get started.'
+  },
+  create: {
+    defaultName: 'My server',
+    loading: 'Fetching Minecraft versions…',
+    creating: 'Creating your server',
+    creatingHint:
+      'Provisioning the machine, configuring the firewall, installing Java and Minecraft. This usually takes three to five minutes.',
+    title: 'Create a server',
+    name: 'Server name',
+    tier: 'Roughly how many people will play?',
+    noPriceNote:
+      'CraftLift does not show cost estimates, so they can never disagree with your real bill. For actual pricing see the',
+    officialCalculator: 'official Google pricing calculator',
+    version: 'Minecraft version',
+    showAdvanced: 'Show advanced settings',
+    hideAdvanced: 'Hide advanced settings',
+    zone: 'Data centre',
+    zoneHint: 'The closer the data centre is to your players, the lower the latency.',
+    disk: 'Disk space (GB)',
+    floatingIp: 'Use a floating IP (not recommended)',
+    floatingIpHint:
+      'A floating IP costs nothing extra, but the server address changes every time the machine restarts, and you have to send the new address to all your friends. The default fixed address consumes a small amount of your credit.',
+    disclaimer:
+      'I understand that creating a server consumes my Google Cloud credit, and that if my credit is exhausted or my account is a paid account, real charges will apply. CraftLift is not responsible for any charges.',
+    disclaimerNote:
+      'As long as your billing account stays in trial status, Google will not charge you — when the credit runs out your resources stop rather than being billed.',
+    submit: 'Create server',
+    tiers: {
+      small: { name: 'Small', players: '2–4 players' },
+      standard: { name: 'Standard', players: '5–10 players' },
+      large: { name: 'Large', players: '10–20 players' }
+    },
+    zones: {
+      'asia-east1': 'Taiwan',
+      'asia-northeast1': 'Tokyo',
+      'asia-southeast1': 'Singapore',
+      'us-central1': 'US Central',
+      'europe-west1': 'Belgium'
+    }
+  },
+  detail: {
+    confirmDelete:
+      'Delete “{{name}}”? This removes the machine, its disk and its fixed address. The world will be gone too. Consider saving a backup to your PC first.',
+    shutdown: 'Shut down',
+    boot: 'Start',
+    delete: 'Delete server',
+    shutdownNote:
+      'When you shut down, CraftLift first takes a backup and copies the world to your PC before stopping the machine.',
+    needRunning: 'The machine is not running',
+    needRunningHint: 'Press “Start” in the top right to use this tab.',
+    tabs: {
+      console: 'Console',
+      properties: 'Server settings',
+      players: 'Players',
+      files: 'Files',
+      backups: 'Backups'
+    }
+  },
+  console: {
+    machineOff: 'The machine is not running',
+    machineOffHint: 'Press “Start” in the top right. It takes a minute or two.',
+    running: 'Server running',
+    starting: 'Minecraft is starting…',
+    players: '{{count}} / {{max}} players online',
+    restart: 'Restart',
+    stopMc: 'Stop Minecraft',
+    startMc: 'Start Minecraft',
+    noLog: '(no log output yet)',
+    commandPlaceholder: 'Type a command, e.g. time set day',
+    send: 'Send'
+  },
+  files: {
+    notEditable: 'This is not a text file, so it cannot be opened in the built-in editor. Download it instead.',
+    confirmDelete: 'Delete “{{name}}”? This cannot be undone.',
+    up: 'Up',
+    upload: 'Upload file',
+    download: 'Download',
+    jarHint:
+      'Advanced: you can upload your own server jar (Paper, Fabric, …) named server.jar to replace Vanilla. This is unsupported — if it breaks, restoring it is up to you.',
+    restartHint: 'Restart Minecraft for changes to take effect.'
+  },
+  props: {
+    restartNote: 'Press “Restart” on the Console tab for changes to take effect.',
+    saved: 'Saved',
+    values: {
+      peaceful: 'Peaceful',
+      easy: 'Easy',
+      normal: 'Normal',
+      hard: 'Hard',
+      survival: 'Survival',
+      creative: 'Creative',
+      adventure: 'Adventure',
+      spectator: 'Spectator'
+    },
+    fields: {
+      motd: { label: 'Server message', hint: 'The line players see in their server list.' },
+      'max-players': { label: 'Player limit', hint: 'How many people can be online at once.' },
+      difficulty: { label: 'Difficulty', hint: 'Affects mob strength and hunger drain.' },
+      gamemode: { label: 'Default game mode', hint: 'Mode new players join in.' },
+      pvp: { label: 'Allow player combat', hint: 'Turn off so players cannot hurt each other.' },
+      hardcore: { label: 'Hardcore', hint: 'Death turns the player into a spectator permanently.' },
+      'white-list': {
+        label: 'Enable whitelist',
+        hint: 'Only listed players can join. Keeps strangers out.'
+      },
+      'online-mode': {
+        label: 'Verify accounts with Mojang',
+        hint: 'Only genuine Minecraft accounts can connect. Turning this off is a security risk and allows impersonation.'
+      },
+      'allow-nether': { label: 'Allow the Nether', hint: 'Turn off to block Nether portals.' },
+      'allow-flight': {
+        label: 'Allow flight',
+        hint: 'Turning it off kicks flying players, but can also false-positive with some mods.'
+      },
+      'spawn-monsters': { label: 'Spawn monsters', hint: 'Turn off for no zombies, creepers, etc.' },
+      'view-distance': {
+        label: 'View distance',
+        hint: 'How far players can see. Higher costs more CPU — lower it when many people play.'
+      },
+      'simulation-distance': {
+        label: 'Simulation distance',
+        hint: 'How far away blocks keep ticking (crops, redstone…).'
+      },
+      'spawn-protection': {
+        label: 'Spawn protection radius',
+        hint: 'Non-operators cannot build within this radius of spawn. 0 disables it.'
+      },
+      'level-seed': {
+        label: 'World seed',
+        hint: 'Leave blank for random. Only applies when the world is first generated.'
+      }
+    }
+  },
+  players: {
+    note: 'Changes here take effect immediately via server commands — no restart needed.',
+    namePlaceholder: 'Minecraft username',
+    emptyList: '(empty)',
+    whitelist: {
+      title: 'Whitelist',
+      desc: 'When the whitelist is enabled in Server settings, only these players can join.',
+      add: 'Add to whitelist'
+    },
+    ops: {
+      title: 'Operators',
+      desc: 'Operators can run admin commands in-game, such as changing game mode or giving items. Grant carefully.',
+      add: 'Make operator'
+    },
+    banned: { title: 'Banned', desc: 'Banned players cannot connect.', add: 'Ban player' }
+  },
+  backups: {
+    warningTitle: 'These backups live on the cloud machine — they are not a safety net',
+    warningBody:
+      'If your credit runs out or the 90 days expire, Google deletes the whole machine including these backups. The only thing that really saves your world is pressing “Save to PC”. CraftLift does this automatically when you shut the server down.',
+    keepNote: 'The newest {{count}} are kept automatically; older ones are deleted to save space.',
+    createNow: 'Back up now',
+    working: 'Working…',
+    interval: 'Automatic backup interval (hours)',
+    intervalHint:
+      'The server backs itself up on this schedule, asking Minecraft to flush data to disk first.',
+    empty: '(no backups yet)',
+    saveToPc: 'Save to PC'
+  },
+  settings: {
+    general: 'General',
+    language: 'Language',
+    launchAtLogin: 'Start CraftLift when I log in',
+    launchAtLoginHint:
+      'Best left on. The “back up before the trial expires” protection only works while CraftLift is running — with this off, your world may genuinely be lost when the 90 days are up.',
+    backupOnShutdown: 'Copy the world to my PC before shutting down',
+    backupDir: 'Local backup folder',
+    defaultDir: '(default: Documents\\CraftLift Backups)',
+    choose: 'Choose folder',
+    project: 'Current project',
+    billing: {
+      title: 'Cost and credit',
+      note: 'CraftLift cannot read your remaining trial credit — Google provides no API for it. Check the real figure on the official page.',
+      open: 'View my remaining credit'
+    },
+    danger: {
+      title: 'Delete everything',
+      desc: 'Deletes the entire Google Cloud project CraftLift created, including every server, disk, fixed address and firewall rule. This is the only way to guarantee no charges can appear later. Your worlds go with it — make sure you have saved any backups you care about to your PC.',
+      button: 'Delete all cloud resources',
+      working: 'Deleting…',
+      confirm1:
+        'This deletes every server and world, and CraftLift cannot undo it. Have you saved the backups you want to keep to your PC?',
+      confirm2: 'Final confirmation: about to delete the entire project {{projectId}}. Continue?'
+    }
   }
 }

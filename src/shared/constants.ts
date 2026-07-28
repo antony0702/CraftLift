@@ -1,0 +1,91 @@
+/** 打在所有由 CraftLift 建立的資源上的標籤。
+ *  清單頁只顯示帶有這個標籤的機器，避免動到使用者其他用途的 VM。 */
+export const CRAFTLIFT_LABEL = 'craftlift'
+
+/** VM metadata 的鍵名。
+ *  用 metadata 而不是 label 存顯示名稱，是因為 GCP 的 label 只接受
+ *  小寫英數字與連字號，存不了中文；metadata 則可以放任意文字。 */
+export const META = {
+  displayName: 'craftlift-display-name',
+  mcVersion: 'craftlift-mc-version',
+  tier: 'craftlift-tier',
+  createdAt: 'craftlift-created-at'
+} as const
+
+/** Minecraft 伺服器在 VM 上的安裝位置 */
+export const REMOTE = {
+  serverDir: '/opt/minecraft',
+  backupDir: '/opt/minecraft/backups',
+  logFile: '/opt/minecraft/logs/latest.log',
+  serviceName: 'minecraft',
+  rconPort: 25575,
+  gamePort: 25565
+} as const
+
+/** 保留的備份份數上限，超過就刪最舊的 */
+export const BACKUP_KEEP = 5
+
+/**
+ * 機型方案。
+ *
+ * 刻意用「幾個人一起玩」當作選擇依據，而不是叫使用者去看懂 e2-standard-2
+ * 是什麼意思。這裡不標任何金額——估價算錯比不估更糟，UI 上改成提供
+ * 連結讓使用者去看 Google 官方的即時費用。
+ *
+ * jvmHeap 保留約 1/4 記憶體給作業系統與 JVM 本身的非堆積開銷，
+ * 全部給堆積會讓系統在尖峰時被 OOM killer 砍掉。
+ */
+export interface Tier {
+  id: 'small' | 'standard' | 'large'
+  machineType: string
+  ramGb: number
+  jvmHeap: string
+}
+
+export const TIERS: Tier[] = [
+  { id: 'small', machineType: 'e2-medium', ramGb: 4, jvmHeap: '3G' },
+  { id: 'standard', machineType: 'e2-standard-2', ramGb: 8, jvmHeap: '6G' },
+  { id: 'large', machineType: 'e2-standard-4', ramGb: 16, jvmHeap: '12G' }
+]
+
+export const DEFAULT_TIER = 'standard'
+
+/** 可選區域。預設彰化，台灣玩家延遲最低。 */
+export interface Zone {
+  id: string
+  region: string
+}
+
+export const ZONES: Zone[] = [
+  { id: 'asia-east1-b', region: 'asia-east1' },
+  { id: 'asia-northeast1-b', region: 'asia-northeast1' },
+  { id: 'asia-southeast1-b', region: 'asia-southeast1' },
+  { id: 'us-central1-a', region: 'us-central1' },
+  { id: 'europe-west1-b', region: 'europe-west1' }
+]
+
+export const DEFAULT_ZONE = 'asia-east1-b'
+
+/** 磁碟預設 50GB pd-balanced。
+ *  不用 pd-standard(HDD) 是因為 Minecraft 載入區塊很吃隨機讀取，HDD 會明顯卡頓。 */
+export const DEFAULT_DISK_GB = 50
+export const DISK_TYPE = 'pd-balanced'
+
+/** 預設啟用靜態 IP。關掉的話 VM 每次重開機位址都會變。 */
+export const DEFAULT_USE_STATIC_IP = true
+
+/** 自動建立的預算警示金額（美元）。
+ *  Google 會在達到門檻時直接寄信給使用者，這是唯一不需要 app 開著就能生效的防護。 */
+export const BUDGET_ALERT_USD = 250
+
+/** 需要啟用的 GCP API */
+export const REQUIRED_APIS = [
+  'compute.googleapis.com',
+  'cloudbilling.googleapis.com',
+  'billingbudgets.googleapis.com'
+] as const
+
+/** 使用者查看真實額度的官方頁面。
+ *  我們不自己算錢，一律導向 Google 自己的數字。 */
+export const BILLING_CONSOLE_URL = 'https://console.cloud.google.com/billing'
+export const PRICING_CALCULATOR_URL = 'https://cloud.google.com/products/calculator'
