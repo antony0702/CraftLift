@@ -1,5 +1,6 @@
 /* CraftLift 介面樣式。
-   刻意用深色系：Minecraft 玩家多半在晚上開服，深色比較不刺眼。 */
+   深色系：Minecraft 玩家多半在晚上開服，深色比較不刺眼。
+   目前以「清楚可用」為目標，正式美術之後再統一調整。 */
 
 :root {
   --bg: #12141a;
@@ -12,6 +13,7 @@
   --accent-hover: #22c55e;
   --accent-ink: #05240f;
   --danger: #f87171;
+  --warn: #fbbf24;
   --radius: 12px;
 }
 
@@ -29,31 +31,167 @@ body {
   user-select: none;
 }
 
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input,
+select,
+textarea {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  width: 100%;
+  user-select: text;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+button {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  font-weight: 700;
+  padding: 10px 20px;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.link:hover {
+  color: var(--text);
+}
+
+button.link.active {
+  color: var(--accent);
+}
+
+button.link.inline {
+  padding: 0;
+  font-size: inherit;
+}
+
+button.link.danger,
+.danger-button {
+  color: var(--danger);
+}
+
+.danger-button {
+  background: none;
+  border: 1px solid var(--danger);
+  font-weight: 600;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: var(--danger);
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* ---------- 版面 ---------- */
+
 .app {
-  max-width: 720px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 32px 28px 48px;
+  padding: 24px 28px 60px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page.narrow {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.center {
+  text-align: center;
+}
+
+.nowrap {
+  white-space: nowrap;
 }
 
 /* ---------- 頁首 ---------- */
 
 .app-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 13px;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.brand:hover {
+  border: none;
 }
 
 .brand-mark {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
   background: linear-gradient(135deg, var(--accent), #16a34a);
   flex-shrink: 0;
@@ -61,87 +199,47 @@ body {
 
 .app-header h1 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: 0.3px;
+  font-size: 21px;
 }
 
 .tagline {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12.5px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .lang-select {
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  width: auto;
   padding: 6px 10px;
   font-size: 13px;
-  cursor: pointer;
 }
 
-/* ---------- 步驟指示 ---------- */
-
-.steps {
-  display: flex;
-  gap: 8px;
-  list-style: none;
-  margin: 0 0 20px;
-  padding: 0;
-}
-
-.steps li {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.steps li.active {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.steps li.done {
-  color: var(--accent);
-}
-
-.step-index {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--surface-raised);
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.steps li.active .step-index {
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 700;
-}
-
-/* ---------- 主卡片 ---------- */
+/* ---------- 卡片 ---------- */
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 28px;
+  padding: 24px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
 .card h2 {
-  margin: 0 0 10px;
-  font-size: 19px;
+  margin: 0;
+  font-size: 18px;
 }
 
 .muted {
@@ -152,113 +250,552 @@ body {
   font-size: 13px;
 }
 
-.label {
-  margin: 20px 0 8px;
+.label,
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
+  margin-bottom: 6px;
 }
 
-.account {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--accent);
-  margin: 4px 0 12px;
-  user-select: text;
+.field {
+  display: block;
+  margin: 16px 0;
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: auto;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form input {
+  flex: 1;
+}
+
+.inline-form button {
+  white-space: nowrap;
+}
+
+.advanced {
+  border-left: 2px solid var(--border);
+  padding-left: 16px;
+  margin: 12px 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
 
 .badge {
   display: inline-block;
-  margin: 4px 0 16px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: rgba(74, 222, 128, 0.12);
   color: var(--accent);
   font-size: 12px;
 }
 
+.badge.warn {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warn);
+}
+
 .error {
   color: var(--danger);
   font-size: 13px;
-  word-break: break-all;
+  word-break: break-word;
   user-select: text;
+  white-space: pre-wrap;
+}
+
+.notice {
+  border: 1px solid var(--warn);
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+/* ---------- 說明泡泡 ---------- */
+
+.info-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: italic;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.info-bubble {
+  display: none;
+  position: absolute;
+  bottom: 140%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 270px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-style: normal;
+  line-height: 1.5;
+  text-align: left;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.info-icon:hover .info-bubble,
+.info-icon:focus .info-bubble {
+  display: block;
 }
 
 /* ---------- 指令方塊 ---------- */
 
 .command-row {
   display: flex;
-  align-items: stretch;
   gap: 8px;
 }
 
-.command-row code {
-  flex: 1;
+.command-row code,
+code.path,
+code.ip {
   background: #0d0f14;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 9px 12px;
   font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #a5d6ff;
   user-select: text;
   overflow-x: auto;
   white-space: nowrap;
 }
 
+.command-row code {
+  flex: 1;
+}
+
 .command-row button {
   min-width: 52px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 13px;
 }
 
-.command-row button:hover {
-  border-color: var(--accent);
+/* ---------- 方案卡片 ---------- */
+
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
-/* ---------- 按鈕 ---------- */
-
-.actions {
+.tier-card {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 24px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 12px;
+  text-align: left;
+  background: var(--surface-raised);
 }
 
-button.primary {
+.tier-card.selected {
+  border-color: var(--accent);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.tier-spec {
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+.disclaimer {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 20px;
+  background: var(--surface-raised);
+}
+
+/* ---------- 預設／自訂切換 ---------- */
+
+.segmented {
+  display: flex;
+  gap: 0;
+  margin: 14px 0 6px;
+}
+
+.segmented button {
+  flex: 1;
+  border-radius: 0;
+}
+
+.segmented button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+.segmented button.active {
   background: var(--accent);
   color: var(--accent-ink);
-  border: none;
-  border-radius: 9px;
-  padding: 11px 22px;
-  font-size: 14px;
+  border-color: var(--accent);
   font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s;
 }
 
-button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+/* ---------- 費用估算 ---------- */
+
+.estimate {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
 }
 
-button.primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.estimate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.link {
-  color: var(--text-muted);
+.estimate-head .field-label {
+  margin-bottom: 0;
+}
+
+.estimate-figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.estimate-figures div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  border-radius: 8px;
+}
+
+.estimate-figures strong {
+  font-size: 19px;
+  color: var(--accent);
+}
+
+/* 免責文字必須緊貼著數字，分開放就失去意義 */
+.estimate-disclaimer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+/* ---------- 伺服器清單 ---------- */
+
+.server-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.server-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--surface-raised);
+}
+
+.server-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.server-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot.ok {
+  background: var(--accent);
+}
+
+.dot.off {
+  background: var(--text-muted);
+}
+
+.dot.busy {
+  background: var(--warn);
+}
+
+/* ---------- 伺服器詳細頁 ---------- */
+
+.detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.detail-title h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.address {
+  font-family: 'Cascadia Mono', Consolas, monospace;
   font-size: 13px;
-  text-decoration: none;
+  color: var(--accent);
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
   border-bottom: 1px solid var(--border);
 }
 
-.link:hover {
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--text-muted);
+  padding: 10px 14px;
+}
+
+.tab:hover {
+  border-color: transparent;
   color: var(--text);
+}
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- 主控台 ---------- */
+
+.console-bar,
+.files-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.log {
+  background: #0d0f14;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  height: 380px;
+  overflow: auto;
+  margin: 0;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.command-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.command-bar .prompt {
+  color: var(--accent);
+  font-family: 'Cascadia Mono', Consolas, monospace;
+}
+
+/* ---------- 檔案表格 ---------- */
+
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.file-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-name {
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+}
+
+.file-name:hover {
+  color: var(--accent);
+  border: none;
+}
+
+.editor {
+  height: 380px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  resize: vertical;
+  white-space: pre;
+}
+
+/* ---------- 玩家名單 ---------- */
+
+.player-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.player-section h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.chip button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.chip button:hover {
+  color: var(--danger);
+  border: none;
+}
+
+/* ---------- 對話框 ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  color: var(--text-muted);
+  word-break: break-all;
 }
 
 /* ---------- 載入中 ---------- */
