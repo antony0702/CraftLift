@@ -1,0 +1,64 @@
+name: Build
+
+# 每次推上 main 或開 PR 都自動建置一次。
+# 這同時是「可驗證來源」的基礎：任何人都能在這裡看到某個 exe
+# 是從哪一份原始碼、用什麼流程編出來的。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安裝相依套件
+        run: npm ci
+
+      # Electron 的執行檔是透過 postinstall 下載的，偶爾會安靜地失敗。
+      # 這一步確認它真的存在，沒有的話補下載一次。
+      - name: 確認 Electron 執行檔存在
+        shell: pwsh
+        run: |
+          if (-not (Test-Path node_modules/electron/dist/electron.exe)) {
+            Write-Host "Electron 執行檔不存在，重新下載"
+            node node_modules/electron/install.js
+          }
+
+      - name: 型別檢查
+        run: npm run typecheck
+
+      - name: 建置 Windows 安裝檔
+        run: npm run build:win
+
+      # 產生校驗碼讓使用者能驗證下載到的檔案沒有被竄改。
+      # 因為我們沒有程式碼簽章，這是使用者唯一能驗證來源的方法。
+      - name: 產生 SHA256 校驗碼
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem release/*.exe
+          foreach ($f in $files) {
+            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
+            "$hash  $($f.Name)" | Out-File -FilePath "release/SHA256SUMS.txt" -Append -Encoding utf8
+            Write-Host "$hash  $($f.Name)"
+          }
+
+      - name: 上傳建置產物
+        uses: actions/upload-artifact@v4
+        with:
+          name: CraftLift-Windows
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+          retention-days: 30

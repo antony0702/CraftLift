@@ -1,0 +1,289 @@
+/* CraftLift 介面樣式。
+   刻意用深色系：Minecraft 玩家多半在晚上開服，深色比較不刺眼。 */
+
+:root {
+  --bg: #12141a;
+  --surface: #1a1d26;
+  --surface-raised: #232733;
+  --border: #2f3441;
+  --text: #e8eaf0;
+  --text-muted: #9aa2b5;
+  --accent: #4ade80;
+  --accent-hover: #22c55e;
+  --accent-ink: #05240f;
+  --danger: #f87171;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Microsoft JhengHei', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  user-select: none;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 28px 48px;
+}
+
+/* ---------- 頁首 ---------- */
+
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #16a34a);
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.3px;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.lang-select {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---------- 步驟指示 ---------- */
+
+.steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.steps li.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.steps li.done {
+  color: var(--accent);
+}
+
+.step-index {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.steps li.active .step-index {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* ---------- 主卡片 ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.label {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 4px 0 12px;
+  user-select: text;
+}
+
+.badge {
+  display: inline-block;
+  margin: 4px 0 16px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 13px;
+  word-break: break-all;
+  user-select: text;
+}
+
+/* ---------- 指令方塊 ---------- */
+
+.command-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.command-row code {
+  flex: 1;
+  background: #0d0f14;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 13px;
+  color: #a5d6ff;
+  user-select: text;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.command-row button {
+  min-width: 52px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.command-row button:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- 按鈕 ---------- */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  border-radius: 9px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.link {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+/* ---------- 載入中 ---------- */
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 0;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

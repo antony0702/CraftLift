@@ -1,0 +1,26 @@
+# 相依套件（幾萬個檔案，絕對不要進版控）
+node_modules/
+
+# 建置產物
+out/
+dist/
+release/
+*.tsbuildinfo
+
+# 記錄檔
+*.log
+npm-debug.log*
+
+# 編輯器與作業系統雜物
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本機環境設定（可能含個人資訊，不要外流）
+.env
+.env.local
+
+# Claude Code 的本機權限設定，屬於個人偏好而非專案內容
+.claude/settings.local.json

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CraftLift</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      內容安全政策：禁止畫面載入任何外部程式碼。
+      本軟體所有畫面都是本機檔案，永遠不需要從網路抓 script，
+      所以把 default-src 鎖在 'self' 是零代價的防護。
+      connect-src 開放 localhost 是給開發模式的即時更新用的。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:* http://localhost:*; img-src 'self' data:;"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

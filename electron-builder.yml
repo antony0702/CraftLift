@@ -1,0 +1,33 @@
+appId: dev.craftlift.app
+productName: CraftLift
+copyright: Copyright © 2026 antony0702
+
+directories:
+  buildResources: build
+  output: release
+
+# 只把編譯產物和 package.json 打包進去。
+# 原始碼與開發工具不需要跟著發布，能大幅縮小安裝檔。
+files:
+  - out/**
+  - package.json
+
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-Setup.${ext}
+
+nsis:
+  # oneClick: false 讓使用者看得到安裝流程、能選安裝位置，
+  # 對「從網路下載陌生軟體」的情境來說，看得到過程比較安心。
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # perMachine: false 表示安裝到使用者目錄，不需要管理員權限。
+  # 少一個 UAC 彈窗就少一個嚇跑使用者的機會。
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# 本專案不做程式碼簽章（憑證一年要價數百美金）。
+# 這代表 Windows SmartScreen 會對使用者顯示警告畫面，
+# README 有說明這件事以及如何用校驗碼驗證檔案來源。

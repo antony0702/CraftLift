@@ -1,0 +1,12 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["electron.vite.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["electron-vite/node", "node"],
+    // TypeScript 7 移除了 baseUrl，paths 的值一律要寫成相對路徑
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    }
+  }
+}
