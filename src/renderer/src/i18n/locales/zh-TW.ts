@@ -8,6 +8,7 @@ export default {
     error: '發生錯誤',
     retry: '重試',
     copied: '已複製',
+    copy: '複製',
     cancel: '取消',
     save: '儲存',
     saving: '儲存中…',
@@ -65,11 +66,13 @@ export default {
     }
   },
   list: {
-    loading: '正在讀取你的伺服器……',
-    title: '我的伺服器',
-    create: '建立新伺服器',
-    empty: '還沒有任何伺服器',
-    emptyHint: '按右上角的「建立新伺服器」開始。'
+    loading: '正在讀取你的世界……',
+    title: '你的世界',
+    create: '開一個新世界',
+    manage: '進入管理',
+    playing: '{{count}} 人在裡面',
+    empty: '這裡還沒有世界。',
+    emptyHint: '開一個，把位址給朋友，就可以一起玩了。'
   },
   create: {
     defaultName: '我的伺服器',
@@ -137,7 +140,10 @@ export default {
       '確定要刪除「{{name}}」嗎？這會一併刪除機器、磁碟與固定位址，世界存檔也會消失。建議先到「備份」分頁把存檔存到電腦。',
     shutdown: '關機',
     boot: '開機',
-    delete: '刪除伺服器',
+    delete: '刪除這個世界',
+    version: '版本',
+    machine: '機器',
+    zone: '機房',
     shutdownNote: '按下關機時，CraftLift 會先自動備份並把存檔帶回你的電腦，再把機器關掉。',
     needRunning: '機器目前沒有執行',
     needRunningHint: '請先按右上角的「開機」，這個分頁才能使用。',
@@ -154,6 +160,8 @@ export default {
     machineOffHint: '按右上角的「開機」啟動它，大約需要一到兩分鐘。',
     running: '伺服器執行中',
     starting: 'Minecraft 啟動中……',
+    who: '在裡面的人',
+    nobody: '目前沒有人',
     players: '線上 {{count}} / {{max}} 人',
     restart: '重新啟動',
     stopMc: '停止 Minecraft',
@@ -248,6 +256,8 @@ export default {
   },
   settings: {
     general: '一般設定',
+    theme: '介面配色',
+    themes: { system: '跟隨系統', light: '淺色', dark: '深色' },
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:

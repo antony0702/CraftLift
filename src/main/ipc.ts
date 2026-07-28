@@ -40,7 +40,12 @@ import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
 import type { ServerConnection } from './server/ssh'
 import * as ops from './server/operations'
-import { defaultLocalBackupDir, getPreferences, setPreferences } from './preferences'
+import {
+  defaultLocalBackupDir,
+  effectiveTheme,
+  getPreferences,
+  setPreferences
+} from './preferences'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -319,6 +324,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> =>
     setPreferences(updates)
   )
+
+  /** 目前實際採用的配色。設定為「跟隨系統」時，這裡回傳解析後的結果。 */
+  handle('theme:effective', async (): Promise<'light' | 'dark'> => effectiveTheme())
 
   handle('app:openExternal', async (url: string): Promise<void> => {
     // 只放行 https，避免畫面端被誘導去開本機檔案或執行檔

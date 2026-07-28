@@ -1,16 +1,24 @@
 import type { ReactNode } from 'react'
 
-/** 一組樸素的共用元件。目前以「能用」為準，美術之後再統一調整。 */
+/** 共用元件。全部沿用同一套語彙：硬邊、無圓角、間距對齊 11px 格線。 */
 
-export function Spinner(): React.JSX.Element {
-  return <div className="spinner" />
+/** 等待指示：逐格四階，跟世界方塊的光池是同一套語言，不用漸變。 */
+export function Waiting(): React.JSX.Element {
+  return (
+    <span className="waiting" aria-hidden>
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+  )
 }
 
 export function Loading({ text }: { text?: string }): React.JSX.Element {
   return (
     <div className="centered">
-      <Spinner />
-      {text && <p>{text}</p>}
+      <Waiting />
+      {text && <p className="muted small">{text}</p>}
     </div>
   )
 }
@@ -18,28 +26,6 @@ export function Loading({ text }: { text?: string }): React.JSX.Element {
 export function ErrorText({ children }: { children: ReactNode }): React.JSX.Element | null {
   if (!children) return null
   return <p className="error">{children}</p>
-}
-
-export function Card({
-  title,
-  children,
-  actions
-}: {
-  title?: ReactNode
-  children: ReactNode
-  actions?: ReactNode
-}): React.JSX.Element {
-  return (
-    <section className="card">
-      {(title || actions) && (
-        <div className="card-head">
-          {title && <h2>{title}</h2>}
-          {actions && <div className="card-actions">{actions}</div>}
-        </div>
-      )}
-      {children}
-    </section>
-  )
 }
 
 export function Field({
@@ -55,21 +41,18 @@ export function Field({
     <label className="field">
       <span className="field-label">
         {label}
-        {hint && <InfoIcon text={hint} />}
+        {hint && <Info text={hint} />}
       </span>
       {children}
     </label>
   )
 }
 
-/**
- * 滑鼠移上去會顯示說明的小圖示。
- * 用在那些「一般玩家看不懂但又必須提供」的進階選項旁邊。
- */
-export function InfoIcon({ text }: { text: ReactNode }): React.JSX.Element {
+/** 滑鼠移上去顯示說明。用在那些一般玩家看不懂但必須提供的進階選項旁。 */
+export function Info({ text }: { text: ReactNode }): React.JSX.Element {
   return (
-    <span className="info-icon" tabIndex={0}>
-      i<span className="info-bubble">{text}</span>
+    <span className="info" tabIndex={0}>
+      i<span>{text}</span>
     </span>
   )
 }
@@ -84,11 +67,11 @@ export function Modal({
   onClose: () => void
 }): React.JSX.Element {
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h3>{title}</h3>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="close">
+          <span className="path">{title}</span>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="close">
             ✕
           </button>
         </div>
@@ -108,12 +91,14 @@ export function Tabs({
   onChange: (id: string) => void
 }): React.JSX.Element {
   return (
-    <div className="tabs">
+    <div className="tabs" role="tablist">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
-          className={tab.id === active ? 'tab active' : 'tab'}
+          role="tab"
+          className="tab"
+          aria-selected={tab.id === active}
           onClick={() => onChange(tab.id)}
         >
           {tab.label}
@@ -123,8 +108,18 @@ export function Tabs({
   )
 }
 
-export function StatusDot({ state }: { state: string }): React.JSX.Element {
-  const tone =
-    state === 'RUNNING' ? 'ok' : state === 'TERMINATED' || state === 'SUSPENDED' ? 'off' : 'busy'
-  return <span className={`dot ${tone}`} />
+/** 空狀態：邀請使用者動手，不是道歉。 */
+export function Blank({
+  children,
+  action
+}: {
+  children: ReactNode
+  action?: ReactNode
+}): React.JSX.Element {
+  return (
+    <div className="blank">
+      {children}
+      {action && <div style={{ marginTop: 22 }}>{action}</div>}
+    </div>
+  )
 }

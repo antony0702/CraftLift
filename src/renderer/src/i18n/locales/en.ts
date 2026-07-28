@@ -8,6 +8,7 @@ export default {
     error: 'Something went wrong',
     retry: 'Retry',
     copied: 'Copied',
+    copy: 'Copy',
     cancel: 'Cancel',
     save: 'Save',
     saving: 'Saving…',
@@ -67,11 +68,13 @@ export default {
     }
   },
   list: {
-    loading: 'Loading your servers…',
-    title: 'My servers',
-    create: 'New server',
-    empty: 'No servers yet',
-    emptyHint: 'Press “New server” in the top right to get started.'
+    loading: 'Loading your worlds…',
+    title: 'Your worlds',
+    create: 'Start a new world',
+    manage: 'Manage',
+    playing: '{{count}} playing',
+    empty: 'No worlds here yet.',
+    emptyHint: 'Start one, send your friends the address, and you are playing together.'
   },
   create: {
     defaultName: 'My server',
@@ -140,7 +143,10 @@ export default {
       'Delete “{{name}}”? This removes the machine, its disk and its fixed address. The world will be gone too. Consider saving a backup to your PC first.',
     shutdown: 'Shut down',
     boot: 'Start',
-    delete: 'Delete server',
+    delete: 'Delete this world',
+    version: 'Version',
+    machine: 'Machine',
+    zone: 'Data centre',
     shutdownNote:
       'When you shut down, CraftLift first takes a backup and copies the world to your PC before stopping the machine.',
     needRunning: 'The machine is not running',
@@ -158,6 +164,8 @@ export default {
     machineOffHint: 'Press “Start” in the top right. It takes a minute or two.',
     running: 'Server running',
     starting: 'Minecraft is starting…',
+    who: 'In here now',
+    nobody: 'Nobody right now',
     players: '{{count}} / {{max}} players online',
     restart: 'Restart',
     stopMc: 'Stop Minecraft',
@@ -262,6 +270,8 @@ export default {
   },
   settings: {
     general: 'General',
+    theme: 'Appearance',
+    themes: { system: 'Match system', light: 'Light', dark: 'Dark' },
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:

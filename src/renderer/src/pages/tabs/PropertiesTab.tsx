@@ -137,7 +137,7 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
         <button type="button" className="primary" disabled={saving} onClick={() => void save()}>
           {saving ? t('common.saving') : t('common.save')}
         </button>
-        {saved && <span className="badge">{t('props.saved')}</span>}
+        {saved && <span className="muted small">{t('props.saved')}</span>}
       </div>
     </div>
   )

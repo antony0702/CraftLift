@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BillingAccount } from '@shared/types'
 import { call, errorText } from '../lib/api'
-import { Card, ErrorText, Loading } from '../components/Ui'
+import { ErrorText, Loading } from '../components/Ui'
+import { Copy } from '../components/Icons'
+import WorldBlock from '../components/WorldBlock'
 
 const INSTALL_COMMAND = 'winget install --id Google.CloudSDK'
 const GCLOUD_DOWNLOAD = 'https://cloud.google.com/sdk/docs/install'
@@ -19,23 +21,26 @@ type Phase =
   | 'error'
 
 /**
- * 首次設定流程。
+ * 首次設定。
  *
- * 誠實地說，這裡有一段是無法自動化的：建立 Google 帳號、綁定信用卡。
- * Google 規定那必須由使用者本人在瀏覽器完成。這個畫面的責任是
- * 把那一段講清楚並引導過去，其餘全部自動處理。
+ * 有一段無法自動化：建立 Google 帳號、綁定信用卡。Google 規定那必須由
+ * 使用者本人在瀏覽器完成。這個畫面的責任是把那一段講清楚並引導過去，
+ * 其餘全部自動處理。
  */
-export default function Setup({ onReady }: { onReady: (projectId: string) => void }): React.JSX.Element {
+export default function Setup({
+  onReady
+}: {
+  onReady: (projectId: string) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>('checking')
   const [version, setVersion] = useState<string | null>(null)
   const [account, setAccount] = useState<string | null>(null)
-  const [billingAccounts, setBillingAccounts] = useState<BillingAccount[]>([])
-  const [selectedBilling, setSelectedBilling] = useState<string>('')
+  const [billing, setBilling] = useState<BillingAccount[]>([])
+  const [selected, setSelected] = useState('')
+  const [detected, setDetected] = useState(0)
   const [message, setMessage] = useState('')
   const [copied, setCopied] = useState(false)
-  /** 偵測到的帳單帳戶總數（含無法使用的），用來在找不到時給出有意義的訊息 */
-  const [detectedCount, setDetectedCount] = useState(0)
 
   const check = useCallback(async () => {
     setPhase('checking')
@@ -49,17 +54,16 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
       setAccount(auth.account)
       if (!auth.loggedIn) return setPhase('need-login')
 
-      // 已經有專案的話直接進主畫面
       const existing = await call(window.api.project.current())
       if (existing) return onReady(existing)
 
       const accounts = await call(window.api.project.billingAccounts())
       const usable = accounts.filter((a) => a.open)
-      setDetectedCount(accounts.length)
-      setBillingAccounts(usable)
+      setDetected(accounts.length)
+      setBilling(usable)
       if (usable.length === 0) return setPhase('no-billing')
 
-      setSelectedBilling(usable[0].id)
+      setSelected(usable[0].id)
       setPhase('pick-billing')
     } catch (err) {
       setMessage(errorText(err))
@@ -73,9 +77,7 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
 
   /**
    * 使用者切到瀏覽器裝 gcloud 或申請帳單帳戶，弄完切回來時自動重新檢查。
-   *
-   * 沒有這段的話，畫面會一直停在「還沒有可用的帳單帳戶」，使用者明明已經
-   * 辦好了卻以為程式壞掉——這是這個流程最容易讓人卡住的地方。
+   * 沒有這段的話，畫面會一直停在原地，使用者明明已經辦好了卻以為程式壞掉。
    */
   useEffect(() => {
     if (phase !== 'gcloud-missing' && phase !== 'no-billing') return
@@ -84,7 +86,7 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
     return () => window.removeEventListener('focus', onFocus)
   }, [phase, check])
 
-  const handleLogin = async (): Promise<void> => {
+  const login = async (): Promise<void> => {
     setPhase('logging-in')
     setMessage('')
     try {
@@ -96,120 +98,117 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
     }
   }
 
-  const handlePrepare = async (): Promise<void> => {
+  const prepare = async (): Promise<void> => {
     setPhase('preparing')
     setMessage('')
     try {
-      const projectId = await call(window.api.project.ensure(selectedBilling))
-      onReady(projectId)
+      onReady(await call(window.api.project.ensure(selected)))
     } catch (err) {
       setMessage(errorText(err))
       setPhase('pick-billing')
     }
   }
 
-  const copyCommand = async (): Promise<void> => {
+  const copy = async (): Promise<void> => {
     await navigator.clipboard.writeText(INSTALL_COMMAND)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const openExternal = (url: string): void => void window.api.app.openExternal(url)
+  const open = (url: string): void => void window.api.app.openExternal(url)
 
   return (
-    <div className="page narrow">
-      {phase === 'checking' && (
-        <Card>
-          <Loading text={t('setup.checking')} />
-        </Card>
-      )}
+    <div className="screen narrow">
+      {phase === 'checking' && <Loading text={t('setup.checking')} />}
 
       {phase === 'gcloud-missing' && (
-        <Card title={t('setup.gcloudMissing.title')}>
-          <p className="muted">{t('setup.gcloudMissing.desc')}</p>
-          <p className="label">{t('setup.gcloudMissing.how')}</p>
-          <div className="command-row">
+        <>
+          <div className="eyebrow">{t('setup.steps.environment')}</div>
+          <h2>{t('setup.gcloudMissing.title')}</h2>
+          <p className="muted small">{t('setup.gcloudMissing.desc')}</p>
+          <p className="field-label">{t('setup.gcloudMissing.how')}</p>
+          <div className="command">
             <code>{INSTALL_COMMAND}</code>
-            <button type="button" onClick={() => void copyCommand()}>
-              {copied ? t('common.copied') : '⧉'}
+            <button type="button" onClick={() => void copy()} aria-label={t('common.copy')}>
+              {copied ? t('common.copied') : <Copy />}
             </button>
           </div>
           <p className="muted small">{t('setup.gcloudMissing.afterInstall')}</p>
           <div className="actions">
-            <button type="button" className="primary" onClick={() => void check()}>
+            <button type="button" className="torch" onClick={() => void check()}>
               {t('setup.gcloudMissing.recheck')}
             </button>
-            <button type="button" className="link" onClick={() => openExternal(GCLOUD_DOWNLOAD)}>
+            <button type="button" className="bare" onClick={() => open(GCLOUD_DOWNLOAD)}>
               {t('setup.gcloudMissing.download')}
             </button>
           </div>
-        </Card>
+        </>
       )}
 
       {(phase === 'need-login' || phase === 'logging-in') && (
-        <Card title={t('setup.login.title')}>
-          <p className="muted">{t('setup.login.desc')}</p>
-          {version && <p className="badge">✓ Google Cloud CLI {version}</p>}
+        <>
+          <div className="eyebrow">{t('setup.steps.account')}</div>
+          <h2>{t('setup.login.title')}</h2>
+          <p className="muted small">{t('setup.login.desc')}</p>
+          {version && <p className="muted small fact">Google Cloud CLI {version}</p>}
           {phase === 'logging-in' ? (
             <>
               <Loading text={t('setup.login.waiting')} />
-              <p className="muted small center">{t('setup.login.waitingHint')}</p>
+              <p className="muted small">{t('setup.login.waitingHint')}</p>
             </>
           ) : (
             <div className="actions">
-              <button type="button" className="primary" onClick={() => void handleLogin()}>
+              <button type="button" className="torch" onClick={() => void login()}>
                 {t('setup.login.button')}
               </button>
             </div>
           )}
           <ErrorText>{message}</ErrorText>
-        </Card>
+        </>
       )}
 
       {phase === 'no-billing' && (
-        <Card title={t('setup.noBilling.title')}>
-          <p className="muted">{t('setup.noBilling.desc')}</p>
+        <>
+          <div className="eyebrow">{t('setup.steps.account')}</div>
+          <h2>{t('setup.noBilling.title')}</h2>
+          <p className="muted small">{t('setup.noBilling.desc')}</p>
           <ul className="muted small">
             <li>{t('setup.noBilling.point1')}</li>
             <li>{t('setup.noBilling.point2')}</li>
             <li>{t('setup.noBilling.point3')}</li>
           </ul>
-          {/* 找得到帳戶但全部無法使用，跟完全找不到是兩種不同的問題，
-              訊息要分開，否則使用者無從判斷該去做什麼 */}
-          {detectedCount > 0 && (
-            <p className="error">{t('setup.noBilling.foundButClosed', { count: detectedCount })}</p>
-          )}
+          {detected > 0 && <ErrorText>{t('setup.noBilling.foundButClosed', { count: detected })}</ErrorText>}
           <p className="muted small">{t('setup.noBilling.autoRecheck')}</p>
           <div className="actions">
-            <button type="button" className="primary" onClick={() => openExternal(FREE_TRIAL_URL)}>
+            <button type="button" className="torch" onClick={() => open(FREE_TRIAL_URL)}>
               {t('setup.noBilling.open')}
             </button>
-            <button type="button" className="link" onClick={() => void check()}>
+            <button type="button" className="bare" onClick={() => void check()}>
               {t('setup.noBilling.recheck')}
             </button>
           </div>
-        </Card>
+        </>
       )}
 
       {(phase === 'pick-billing' || phase === 'preparing') && (
-        <Card title={t('setup.billing.title')}>
-          <p className="muted">
-            {t('setup.billing.signedInAs')} <strong>{account}</strong>
+        <>
+          <div className="eyebrow">{t('setup.steps.server')}</div>
+          <h2>{t('setup.billing.title')}</h2>
+          <p className="muted small">
+            {t('setup.billing.signedInAs')} <span className="fact">{account}</span>
           </p>
+
           {phase === 'preparing' ? (
             <>
               <Loading text={t('setup.billing.preparing')} />
-              <p className="muted small center">{t('setup.billing.preparingHint')}</p>
+              <p className="muted small">{t('setup.billing.preparingHint')}</p>
             </>
           ) : (
             <>
               <label className="field">
                 <span className="field-label">{t('setup.billing.select')}</span>
-                <select
-                  value={selectedBilling}
-                  onChange={(e) => setSelectedBilling(e.target.value)}
-                >
-                  {billingAccounts.map((a) => (
+                <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+                  {billing.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.displayName} ({a.id})
                     </option>
@@ -218,25 +217,27 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
               </label>
               <p className="muted small">{t('setup.billing.whatHappens')}</p>
               <div className="actions">
-                <button type="button" className="primary" onClick={() => void handlePrepare()}>
+                <button type="button" className="torch" onClick={() => void prepare()}>
                   {t('setup.billing.continue')}
                 </button>
               </div>
             </>
           )}
           <ErrorText>{message}</ErrorText>
-        </Card>
+        </>
       )}
 
       {phase === 'error' && (
-        <Card title={t('common.error')}>
+        <>
+          <WorldBlock size={66} lit={false} />
+          <h2>{t('common.error')}</h2>
           <ErrorText>{message}</ErrorText>
           <div className="actions">
-            <button type="button" className="primary" onClick={() => void check()}>
+            <button type="button" className="torch" onClick={() => void check()}>
               {t('common.retry')}
             </button>
           </div>
-        </Card>
+        </>
       )}
     </div>
   )

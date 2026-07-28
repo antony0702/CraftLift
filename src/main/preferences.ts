@@ -1,10 +1,11 @@
-import { app } from 'electron'
+import { app, nativeTheme } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Preferences } from '@shared/types'
 
 const DEFAULTS: Preferences = {
   language: 'zh-TW',
+  theme: 'system',
   // 預設開啟。「試用到期前 7 天自動備份到本機」只有在 CraftLift 有在執行時
   // 才可能發生，關掉這個選項等於讓那道保護失效。
   launchAtLogin: true,
@@ -40,7 +41,25 @@ export async function setPreferences(updates: Partial<Preferences>): Promise<Pre
   if (updates.launchAtLogin !== undefined) {
     applyLaunchAtLogin(next.launchAtLogin)
   }
+  if (updates.theme !== undefined) {
+    applyTheme(next.theme)
+  }
   return next
+}
+
+/**
+ * 把配色選擇交給 Electron。
+ *
+ * 設定 themeSource 之後，'system' 會自動跟隨作業系統，而且使用者在
+ * 系統設定裡切換時 nativeTheme 會發出事件，不需要我們自己輪詢。
+ */
+export function applyTheme(choice: Preferences['theme']): void {
+  nativeTheme.themeSource = choice
+}
+
+/** 目前實際採用的配色。'system' 解析後的結果就在這裡。 */
+export function effectiveTheme(): 'light' | 'dark' {
+  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
 }
 
 /** 把「開機自動啟動」的設定同步到作業系統 */

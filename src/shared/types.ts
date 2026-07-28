@@ -146,9 +146,14 @@ export interface PlayerLists {
   banned: string[]
 }
 
+/** 介面配色。system 表示跟隨作業系統設定。 */
+export type ThemeChoice = 'light' | 'dark' | 'system'
+
 /** 應用程式偏好設定 */
 export interface Preferences {
   language: string
+  /** 使用者選的配色。實際採用哪一套要看 system 解析後的結果。 */
+  theme: ThemeChoice
   /** 開機自動啟動。預設開啟，因為「到期前自動備份」需要 app 有在跑才能生效。 */
   launchAtLogin: boolean
   /** VM 上自動備份的間隔（小時） */

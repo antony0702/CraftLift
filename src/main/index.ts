@@ -1,13 +1,18 @@
-import { app, BrowserWindow, Menu, nativeImage, shell, Tray } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { registerIpcHandlers } from './ipc'
-import { applyLaunchAtLogin, getPreferences } from './preferences'
+import { applyLaunchAtLogin, applyTheme, effectiveTheme, getPreferences } from './preferences'
 import { closeAllConnections } from './server/ssh'
 
-/** 托盤圖示。內嵌成 base64 是為了避免打包後找不到檔案路徑的各種麻煩。
- *  目前是暫時的純色圖示，之後會換成正式美術。 */
+/**
+ * 系統匣圖示：世界方塊的 32×32 版本。
+ *
+ * 內嵌成 base64 是為了避免打包後找不到檔案路徑的麻煩。原始圖由
+ * design/generate-icon.js 產生，要改圖就改那支程式再重跑，
+ * 把 build/tray-base64.txt 的內容貼回這裡。
+ */
 const TRAY_ICON_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABRUlEQVR4nMXXVVICUBjF8W8hoqJiYGOgomKgz7YY2IGBHRgbshO7sAO7cDXHcRwGHFEejHMWcH//lztzr4iPGZ5HkPtkRc6jFdkPw8i6H4L+bhD62wFk3vQj47of6Vd90F32QufoQZqjG6kXXUg5t0B7ZoGv8z8t/2Ucec4xGJyj+CmuPe1E8kkHko7bkXjUhoRD8/dBf41rDszQ7Ld6j/gvPN7egjh7M6h47F4TYnYb3REMPGanwR3AwKO3PQMIeNRWPah45GYd1Bu1ECauXq+BMPGINROEiYevmiBMPGylGsLEQ21VECauslVCmLhquQLCxEOWjBAmHrxohDDxoIVyCBNXzpdBmLhyrhTCxANnSyBMPGCmGMLE/aeL3t8EVPxtDFwx5RHAwBWThe4ABu43UfDxb0DFXaPirlFxb/u1q/bFXgEOsphuY1p1MQAAAABJRU5ErkJggg=='
+  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAnklEQVR42mNgGAWjgEygnTPvPzIe/g5At5AQHj4OINViqjuE7g7AZVBcjxdeTDUHDZgDhAzc/4MwuUFNrMOkvbLBePA6AB1TmghhFqLjoeMAch2Cy+LB6wAVGZH/pGB0Cy205UjCQ98BMEyqxYPXAeQ6hGoWDxoHoIMHVfr/8eH/ByrwYorbAwPuAEIOobnFg8YBuBxENwsHnQOGDQAAT8Pm1lTSPWkAAAAASUVORK5CYII='
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -22,7 +27,7 @@ function createWindow(show = true): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: join(__dirname, '../../build/icon.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // 以下三項是 Electron 的安全基本盤，不要改：
@@ -104,6 +109,14 @@ if (!app.requestSingleInstanceLock()) {
 
     const prefs = await getPreferences()
     applyLaunchAtLogin(prefs.launchAtLogin)
+    applyTheme(prefs.theme)
+
+    // 使用者在作業系統層級切換淺色／深色時通知畫面。
+    // 只有 theme 設為 system 時這件事才會發生，但監聽不需要判斷——
+    // themeSource 被鎖定成 light 或 dark 時，nativeTheme 不會發事件。
+    nativeTheme.on('updated', () => {
+      mainWindow?.webContents.send('theme:changed', effectiveTheme())
+    })
 
     // 開機自動啟動時帶 --hidden，直接縮在系統匣，不要跳視窗打斷使用者
     const startHidden = process.argv.includes('--hidden')

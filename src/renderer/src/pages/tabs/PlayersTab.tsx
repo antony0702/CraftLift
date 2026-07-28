@@ -115,7 +115,7 @@ export default function PlayersTab({ server }: { server: MinecraftServer }): Rea
           {items.length === 0 ? (
             <p className="muted small">{t('players.emptyList')}</p>
           ) : (
-            <ul className="chip-list">
+            <ul className="chips">
               {items.map((name) => (
                 <li key={name} className="chip">
                   {name}

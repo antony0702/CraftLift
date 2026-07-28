@@ -102,9 +102,9 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
 
   return (
     <div className="files">
-      <div className="files-bar">
+      <div className="toolbar">
         <code className="path">{path}</code>
-        <div className="spacer" />
+        <div className="grow" />
         {canGoUp && (
           <button type="button" onClick={() => void load(parent)}>
             {t('files.up')}
@@ -124,7 +124,7 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
       {loading ? (
         <Loading />
       ) : (
-        <table className="file-table">
+        <table className="table">
           <tbody>
             {files.map((file) => (
               <tr key={file.path}>
@@ -139,11 +139,11 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
                 <td className="muted small nowrap">{formatTime(file.modifiedAt)}</td>
                 <td className="nowrap">
                   {!file.isDirectory && (
-                    <button type="button" className="link" onClick={() => void download(file)}>
+                    <button type="button" className="link-btn" onClick={() => void download(file)}>
                       {t('files.download')}
                     </button>
                   )}
-                  <button type="button" className="link danger" onClick={() => void remove(file)}>
+                  <button type="button" className="link-btn danger" onClick={() => void remove(file)}>
                     {t('common.delete')}
                   </button>
                 </td>
@@ -170,7 +170,7 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
             >
               {saving ? t('common.saving') : t('common.save')}
             </button>
-            <button type="button" className="link" onClick={() => setEditing(null)}>
+            <button type="button" className="link-btn" onClick={() => setEditing(null)}>
               {t('common.cancel')}
             </button>
           </div>
