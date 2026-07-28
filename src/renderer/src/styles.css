@@ -451,6 +451,85 @@ code.ip {
   background: var(--surface-raised);
 }
 
+/* ---------- 預設／自訂切換 ---------- */
+
+.segmented {
+  display: flex;
+  gap: 0;
+  margin: 14px 0 6px;
+}
+
+.segmented button {
+  flex: 1;
+  border-radius: 0;
+}
+
+.segmented button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---------- 費用估算 ---------- */
+
+.estimate {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.estimate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.estimate-head .field-label {
+  margin-bottom: 0;
+}
+
+.estimate-figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.estimate-figures div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  border-radius: 8px;
+}
+
+.estimate-figures strong {
+  font-size: 19px;
+  color: var(--accent);
+}
+
+/* 免責文字必須緊貼著數字，分開放就失去意義 */
+.estimate-disclaimer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
 /* ---------- 伺服器清單 ---------- */
 
 .server-list {

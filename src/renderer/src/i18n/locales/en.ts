@@ -49,7 +49,10 @@ export default {
       point2: 'Activation needs a credit card for identity verification. CraftLift never sees your card number.',
       point3: 'Google does not charge you automatically when the credit or the 90 days run out — you have to manually upgrade to a paid account before anything is billed.',
       open: 'Open Google Cloud sign-up',
-      recheck: 'I’ve activated it — check again'
+      recheck: 'I’ve activated it — check again',
+      foundButClosed:
+        'Found {{count}} billing account(s), but all of them are closed and cannot be used. Check in the Google Cloud console whether activation finished.',
+      autoRecheck: 'Switch back to this window after finishing in the browser — it re-checks automatically.'
     },
     billing: {
       title: 'Preparing your cloud environment',
@@ -79,9 +82,32 @@ export default {
     title: 'Create a server',
     name: 'Server name',
     tier: 'Roughly how many people will play?',
-    noPriceNote:
-      'CraftLift does not show cost estimates, so they can never disagree with your real bill. For actual pricing see the',
-    officialCalculator: 'official Google pricing calculator',
+    officialCalculator: 'Open the official Google pricing calculator',
+    family: 'Machine family',
+    familyHint:
+      'E2 is cheap and fine for most cases; N2 and C3 have better single-core performance, which Minecraft benefits from when many people play. Available families differ by region.',
+    predefined: 'Predefined',
+    custom: 'Custom',
+    customUnsupported: 'The {{family}} family does not support custom vCPU and memory — pick a predefined type.',
+    machineType: 'Machine type',
+    sharedCpu: 'shared core',
+    cpus: 'vCPUs',
+    cpusHint: 'Must be an even number above 1. Minecraft is mostly single-threaded, so more cores does not scale linearly.',
+    memory: 'Memory (GB)',
+    memoryHint:
+      'Must be a multiple of 0.25 GB. Each family limits how much memory you can attach per core; Google rejects out-of-range values and explains why.',
+    estimate: {
+      title: 'Cost estimate',
+      heap: '{{heap}} allocated to Minecraft',
+      perMonth: 'per month, always on',
+      perHour: 'per hour while running',
+      diskPerMonth: 'disk per month (billed even when off)',
+      calculating: 'Calculating…',
+      unavailable: 'Pricing data is unavailable right now. This does not prevent you creating the server.',
+      incomplete: 'Some components had no published price, so this estimate is incomplete.',
+      disclaimer:
+        'This is a rough estimate, useful for comparing configurations. Your actual cost is whatever Google bills you, and CraftLift takes no responsibility for the accuracy of this figure. It excludes network egress, discounts and free credits.'
+    },
     version: 'Minecraft version',
     showAdvanced: 'Show advanced settings',
     hideAdvanced: 'Hide advanced settings',

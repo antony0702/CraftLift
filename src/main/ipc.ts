@@ -5,15 +5,17 @@ import type {
   Backup,
   BillingAccount,
   CreateServerOptions,
+  MachineType,
   McVersion,
   MinecraftServer,
   PlayerLists,
   Preferences,
+  PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties
 } from '@shared/types'
-import { REMOTE, TIERS } from '@shared/constants'
+import { jvmHeapFor, REMOTE } from '@shared/constants'
 import { getGcloudStatus } from './gcloud/exec'
 import { getAuthStatus, login } from './gcloud/auth'
 import {
@@ -30,6 +32,9 @@ import {
   startServer,
   stopServer
 } from './gcloud/compute'
+import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
+import { estimatePrice } from './gcloud/pricing'
+import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
 import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
@@ -122,19 +127,30 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   handle('server:create', async (opts: CreateServerOptions): Promise<MinecraftServer> => {
     const projectId = await requireProject()
-    const tier = TIERS.find((t) => t.id === opts.tier)
-    if (!tier) throw new Error(`未知的方案：${opts.tier}`)
-
     const jar = await getServerJarInfo(opts.mcVersion)
     const prefs = await getPreferences()
     const script = buildStartupScript({
       serverJarUrl: jar.url,
       javaMajorVersion: jar.javaMajorVersion,
-      jvmHeap: tier.jvmHeap,
+      // JVM 記憶體依實際選到的機器規格換算，不再綁定固定方案
+      jvmHeap: jvmHeapFor(opts.memoryGb),
       backupIntervalHours: prefs.backupIntervalHours
     })
     return createServer(projectId, opts, script)
   })
+
+  // --- 機型與價格 -----------------------------------------------------------
+  handle('machine:list', async (zone: string): Promise<MachineType[]> =>
+    listMachineTypes(await requireProject(), zone)
+  )
+
+  handle('machine:custom', async (family: string, cpus: number, memoryGb: number): Promise<string> =>
+    buildCustomMachineType(family, cpus, memoryGb)
+  )
+
+  handle('price:estimate', async (input: EstimateInput): Promise<PriceEstimate> =>
+    estimatePrice(input)
+  )
 
   handle('server:get', async (name: string, zone: string): Promise<MinecraftServer> =>
     getServer(await requireProject(), name, zone)

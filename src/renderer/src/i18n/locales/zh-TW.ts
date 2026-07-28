@@ -48,7 +48,10 @@ export default {
       point2: '開通需要一張信用卡驗證身分。CraftLift 不會、也無法接觸到你的卡號。',
       point3: '額度用完或到期時 Google 不會自動扣款，必須你自己手動升級成付費帳戶才會開始計費。',
       open: '前往 Google Cloud 開通',
-      recheck: '我開通好了，重新檢查'
+      recheck: '我開通好了，重新檢查',
+      foundButClosed:
+        '偵測到 {{count}} 個帳單帳戶，但全部處於關閉狀態，無法使用。請到 Google Cloud 主控台確認帳戶是否已完成啟用。',
+      autoRecheck: '在瀏覽器完成申請後切換回這個視窗，畫面會自動重新檢查。'
     },
     billing: {
       title: '準備你的雲端環境',
@@ -77,8 +80,31 @@ export default {
     title: '建立新伺服器',
     name: '伺服器名稱',
     tier: '大概會有多少人一起玩？',
-    noPriceNote: 'CraftLift 不顯示費用估算，以免與實際帳單有落差。實際費用請參考',
-    officialCalculator: 'Google 官方計價機',
+    officialCalculator: '開啟 Google 官方計價機',
+    family: '機器系列',
+    familyHint:
+      'E2 便宜、適合大多數情況；N2／C3 單核效能較好，Minecraft 主要吃單核，人多時會有感。不同區域提供的系列不一樣。',
+    predefined: '預設規格',
+    custom: '自訂規格',
+    customUnsupported: '{{family}} 系列不支援自訂核心與記憶體，請從預設規格中挑選。',
+    machineType: '機型',
+    sharedCpu: '共用核心',
+    cpus: '核心數（vCPU）',
+    cpusHint: '超過 1 個時必須是偶數。Minecraft 主要使用單一核心，核心數多不會等比例變快。',
+    memory: '記憶體（GB）',
+    memoryHint: '必須是 0.25 GB 的倍數。各系列對「每核心可配多少記憶體」有上下限，超出範圍時 Google 會拒絕並回報原因。',
+    estimate: {
+      title: '費用估算',
+      heap: '配給 Minecraft {{heap}}',
+      perMonth: '整月不關機',
+      perHour: '執行中每小時',
+      diskPerMonth: '磁碟每月（關機也算）',
+      calculating: '計算中……',
+      unavailable: '目前無法取得價格資料。這不影響建立伺服器。',
+      incomplete: '部分項目查不到單價，這個估算並不完整。',
+      disclaimer:
+        '以上為概略估算，僅供比較不同規格時參考。實際費用一律以 Google 的帳單為準，CraftLift 不對估算的準確性負責。估算不含網路流量費用，也不含任何折扣或免費額度。'
+    },
     version: 'Minecraft 版本',
     showAdvanced: '顯示進階設定',
     hideAdvanced: '收起進階設定',

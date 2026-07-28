@@ -34,6 +34,8 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
   const [selectedBilling, setSelectedBilling] = useState<string>('')
   const [message, setMessage] = useState('')
   const [copied, setCopied] = useState(false)
+  /** 偵測到的帳單帳戶總數（含無法使用的），用來在找不到時給出有意義的訊息 */
+  const [detectedCount, setDetectedCount] = useState(0)
 
   const check = useCallback(async () => {
     setPhase('checking')
@@ -53,6 +55,7 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
 
       const accounts = await call(window.api.project.billingAccounts())
       const usable = accounts.filter((a) => a.open)
+      setDetectedCount(accounts.length)
       setBillingAccounts(usable)
       if (usable.length === 0) return setPhase('no-billing')
 
@@ -67,6 +70,19 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
   useEffect(() => {
     void check()
   }, [check])
+
+  /**
+   * 使用者切到瀏覽器裝 gcloud 或申請帳單帳戶，弄完切回來時自動重新檢查。
+   *
+   * 沒有這段的話，畫面會一直停在「還沒有可用的帳單帳戶」，使用者明明已經
+   * 辦好了卻以為程式壞掉——這是這個流程最容易讓人卡住的地方。
+   */
+  useEffect(() => {
+    if (phase !== 'gcloud-missing' && phase !== 'no-billing') return
+    const onFocus = (): void => void check()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [phase, check])
 
   const handleLogin = async (): Promise<void> => {
     setPhase('logging-in')
@@ -158,6 +174,12 @@ export default function Setup({ onReady }: { onReady: (projectId: string) => voi
             <li>{t('setup.noBilling.point2')}</li>
             <li>{t('setup.noBilling.point3')}</li>
           </ul>
+          {/* 找得到帳戶但全部無法使用，跟完全找不到是兩種不同的問題，
+              訊息要分開，否則使用者無從判斷該去做什麼 */}
+          {detectedCount > 0 && (
+            <p className="error">{t('setup.noBilling.foundButClosed', { count: detectedCount })}</p>
+          )}
+          <p className="muted small">{t('setup.noBilling.autoRecheck')}</p>
           <div className="actions">
             <button type="button" className="primary" onClick={() => openExternal(FREE_TRIAL_URL)}>
               {t('setup.noBilling.open')}

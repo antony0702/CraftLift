@@ -55,11 +55,48 @@ export interface MinecraftServer {
   createdAt: string | null
 }
 
+/** 一種可選的機器規格 */
+export interface MachineType {
+  /** GCP 的機型名稱，例如 e2-standard-2 */
+  name: string
+  /** 系列代號，例如 e2、n2、c3 */
+  family: string
+  cpus: number
+  memoryGb: number
+  /** 共用核心機型（e2-micro 等）效能會被限制 */
+  isSharedCpu: boolean
+  description: string
+}
+
+/**
+ * 費用估算結果。
+ *
+ * 這是估計值而非帳單：不含網路流量（取決於玩家人數與遊玩時數）、
+ * 不含任何折扣或免費額度。complete 為 false 表示有項目查不到單價，
+ * 此時 UI 必須明確告知使用者估算不完整，不可假裝數字是準的。
+ */
+export interface PriceEstimate {
+  currency: string
+  /** 機器執行中的每小時費用（含固定位址） */
+  hourlyRunning: number
+  /** 全月不關機的總費用（含磁碟） */
+  monthlyAlwaysOn: number
+  /** 磁碟每月費用。磁碟就算關機也照算。 */
+  monthlyDisk: number
+  complete: boolean
+  /** 查不到單價的項目 */
+  missing: string[]
+}
+
 /** 建立伺服器精靈收集到的設定 */
 export interface CreateServerOptions {
   displayName: string
   mcVersion: string
-  tier: string
+  /** GCP 機型名稱。可以是預設規格，也可以是 e2-custom-4-8192 這種自訂規格。 */
+  machineType: string
+  /** 這個機型的核心數與記憶體，用來換算 JVM 記憶體與顯示 */
+  cpus: number
+  memoryGb: number
   zone: string
   diskGb: number
   useStaticIp: boolean

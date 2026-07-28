@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CreateServerOptions, InstanceState, MinecraftServer } from '@shared/types'
-import { CRAFTLIFT_LABEL, DISK_TYPE, META, REMOTE, TIERS } from '@shared/constants'
+import { CRAFTLIFT_LABEL, DISK_TYPE, META, REMOTE } from '@shared/constants'
 import { runGcloud, runGcloudJson } from './exec'
 
 /** GCE 執行個體名稱只能用小寫英數字與連字號，所以顯示名稱另外存在 metadata。 */
@@ -178,9 +178,6 @@ export async function createServer(
     throw new Error('DISCLAIMER_NOT_ACCEPTED')
   }
 
-  const tier = TIERS.find((t) => t.id === opts.tier)
-  if (!tier) throw new Error(`未知的方案：${opts.tier}`)
-
   await ensureFirewallRules(projectId)
 
   const name = generateInstanceName()
@@ -205,14 +202,14 @@ export async function createServer(
       name,
       `--project=${projectId}`,
       `--zone=${opts.zone}`,
-      `--machine-type=${tier.machineType}`,
+      `--machine-type=${opts.machineType}`,
       '--image-family=ubuntu-2404-lts-amd64',
       '--image-project=ubuntu-os-cloud',
       `--boot-disk-size=${opts.diskGb}GB`,
       `--boot-disk-type=${DISK_TYPE}`,
       `--tags=${CRAFTLIFT_LABEL}`,
       `--labels=${CRAFTLIFT_LABEL}=true`,
-      `--metadata=${META.mcVersion}=${opts.mcVersion},${META.tier}=${opts.tier},${META.createdAt}=${new Date().toISOString()}`,
+      `--metadata=${META.mcVersion}=${opts.mcVersion},${META.tier}=${opts.machineType},${META.createdAt}=${new Date().toISOString()}`,
       { literal: `--metadata-from-file=startup-script=${scriptPath},${META.displayName}=${namePath}` }
     ]
 

@@ -5,10 +5,12 @@ import type {
   BillingAccount,
   CreateServerOptions,
   GcloudStatus,
+  MachineType,
   McVersion,
   MinecraftServer,
   PlayerLists,
   Preferences,
+  PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties
@@ -44,6 +46,24 @@ const api = {
       invoke('project:ensure', billingAccountId),
     /** 徹底清除：刪掉整個專案，連同所有會計費的資源 */
     delete: (): Promise<Result<void>> => invoke('project:delete')
+  },
+
+  /** 機器規格與費用估算 */
+  machine: {
+    /** 列出該區域可用的所有機型 */
+    list: (zone: string): Promise<Result<MachineType[]>> => invoke('machine:list', zone),
+    /** 組出自訂規格的機型名稱，規格不合法時會回傳錯誤 */
+    custom: (family: string, cpus: number, memoryGb: number): Promise<Result<string>> =>
+      invoke('machine:custom', family, cpus, memoryGb),
+    /** 估算費用。這是估計值，不是帳單。 */
+    estimate: (input: {
+      region: string
+      family: string
+      cpus: number
+      memoryGb: number
+      diskGb: number
+      useStaticIp: boolean
+    }): Promise<Result<PriceEstimate>> => invoke('price:estimate', input)
   },
 
   /** Minecraft 版本清單（來自 Mojang 官方公開資料） */

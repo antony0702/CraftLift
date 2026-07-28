@@ -38,17 +38,29 @@ export const BACKUP_KEEP = 5
 export interface Tier {
   id: 'small' | 'standard' | 'large'
   machineType: string
+  cpus: number
   ramGb: number
-  jvmHeap: string
 }
 
 export const TIERS: Tier[] = [
-  { id: 'small', machineType: 'e2-medium', ramGb: 4, jvmHeap: '3G' },
-  { id: 'standard', machineType: 'e2-standard-2', ramGb: 8, jvmHeap: '6G' },
-  { id: 'large', machineType: 'e2-standard-4', ramGb: 16, jvmHeap: '12G' }
+  { id: 'small', machineType: 'e2-medium', cpus: 2, ramGb: 4 },
+  { id: 'standard', machineType: 'e2-standard-2', cpus: 2, ramGb: 8 },
+  { id: 'large', machineType: 'e2-standard-4', cpus: 4, ramGb: 16 }
 ]
 
 export const DEFAULT_TIER = 'standard'
+
+/**
+ * 依機器記憶體換算要給 JVM 的堆積大小。
+ *
+ * 保留約四分之一給作業系統與 JVM 自身的非堆積開銷（執行緒堆疊、
+ * metaspace、GC 結構）。全部給堆積的話，機器會在尖峰時被系統的
+ * OOM killer 直接砍掉，比伺服器卡頓嚴重得多。
+ */
+export function jvmHeapFor(memoryGb: number): string {
+  const heap = Math.max(1, Math.floor(memoryGb * 0.75))
+  return `${heap}G`
+}
 
 /** 可選區域。預設彰化，台灣玩家延遲最低。 */
 export interface Zone {
