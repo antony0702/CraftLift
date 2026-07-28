@@ -25,9 +25,17 @@ export default function PlayersTab({ server }: { server: MinecraftServer }): Rea
     banned: ''
   })
 
+  /** 白名單是否已啟用。啟用但名單是空的時，沒有任何人進得來。 */
+  const [whitelistEnabled, setWhitelistEnabled] = useState(false)
+
   const load = useCallback(async () => {
     try {
-      setLists(await call(window.api.players.get(server.name, server.zone)))
+      const [players, props] = await Promise.all([
+        call(window.api.players.get(server.name, server.zone)),
+        call(window.api.props.get(server.name, server.zone))
+      ])
+      setLists(players)
+      setWhitelistEnabled(props['white-list'] === 'true')
       setMessage('')
     } catch (err) {
       setMessage(errorText(err))
@@ -71,6 +79,14 @@ export default function PlayersTab({ server }: { server: MinecraftServer }): Rea
 
   return (
     <div className="players">
+      {/* 白名單開著又是空的，等於整台伺服器沒人進得來。
+          這是新伺服器的預設狀態，不講清楚的話使用者會以為程式壞了。 */}
+      {whitelistEnabled && lists.whitelist.length === 0 && (
+        <div className="notice">
+          <strong>{t('players.lockedTitle')}</strong>
+          <p className="muted small">{t('players.lockedBody')}</p>
+        </div>
+      )}
       <p className="muted small">{t('players.note')}</p>
       <ErrorText>{message}</ErrorText>
 

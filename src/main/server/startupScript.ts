@@ -58,20 +58,32 @@ RCON_PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 24)
 echo "$RCON_PASSWORD" > ${dir}/rcon-password
 chmod 600 ${dir}/rcon-password
 
+# 新伺服器的預設設定。使用者之後可以在「伺服器設定」分頁改。
+#
+# 注意 white-list=true：這代表伺服器一建好，連建立者自己都進不去，
+# 必須先把玩家加進白名單。這是刻意的選擇——公開的 Minecraft 伺服器
+# 幾分鐘內就會被掃描到，沒有白名單等於開門讓陌生人進來拆房子。
+# UI 會在白名單是空的時候提醒使用者先把自己加進去。
 cat > ${dir}/server.properties <<PROPS
 enable-rcon=true
 rcon.port=${REMOTE.rconPort}
 rcon.password=$RCON_PASSWORD
 broadcast-rcon-to-ops=false
 server-port=${REMOTE.gamePort}
-motd=A CraftLift server
-max-players=20
-online-mode=true
-difficulty=easy
+motd=CraftLift 伺服器
+max-players=10
+difficulty=hard
 gamemode=survival
 pvp=true
+hardcore=false
+white-list=true
+online-mode=true
+allow-nether=true
+allow-flight=false
+spawn-monsters=true
 view-distance=10
-spawn-protection=0
+simulation-distance=10
+spawn-protection=16
 PROPS
 
 # --- RCON 用戶端 ---

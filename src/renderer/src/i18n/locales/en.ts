@@ -229,6 +229,9 @@ export default {
     }
   },
   players: {
+    lockedTitle: 'Nobody can join this server right now',
+    lockedBody:
+      'The whitelist is enabled but empty — nobody can connect, including you. Enter your Minecraft username in the Whitelist field below and add it. If you would rather let anyone join (not recommended — public servers get scanned by strangers within minutes), you can turn the whitelist off under Server settings.',
     note: 'Changes here take effect immediately via server commands — no restart needed.',
     namePlaceholder: 'Minecraft username',
     emptyList: '(empty)',
