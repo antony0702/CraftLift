@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MinecraftServer } from '@shared/types'
-import { REMOTE } from '@shared/constants'
 import { call, errorText } from '../lib/api'
-import { ErrorText, StatusDot, Tabs } from '../components/Ui'
+import { ErrorText, Tabs } from '../components/Ui'
+import { Back } from '../components/Icons'
+import WorldBlock from '../components/WorldBlock'
 import ConsoleTab from './tabs/ConsoleTab'
 import FilesTab from './tabs/FilesTab'
 import PropertiesTab from './tabs/PropertiesTab'
 import PlayersTab from './tabs/PlayersTab'
 import BackupsTab from './tabs/BackupsTab'
 
+/**
+ * 伺服器控制台。
+ *
+ * 左欄回答「這個世界是什麼」——身分、位址、規格、電源；
+ * 右欄回答「正在發生什麼」——日誌、設定、玩家、檔案、備份。
+ * 這樣分工之後，最常看的位址與狀態一直都在，不會被分頁切換洗掉。
+ */
 export default function ServerDetail({
   server: initial,
   onBack,
@@ -25,6 +33,11 @@ export default function ServerDetail({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [copied, setCopied] = useState(false)
+  const [players, setPlayers] = useState<number | null>(null)
+
+  const running = server.state === 'RUNNING'
+  const moving =
+    server.state === 'STAGING' || server.state === 'STOPPING' || server.state === 'PROVISIONING'
 
   const refresh = useCallback(async () => {
     try {
@@ -39,8 +52,27 @@ export default function ServerDetail({
     return () => clearInterval(timer)
   }, [refresh])
 
-  const running = server.state === 'RUNNING'
-  const transitioning = server.state === 'STAGING' || server.state === 'STOPPING' || server.state === 'PROVISIONING'
+  useEffect(() => {
+    if (!running) {
+      setPlayers(null)
+      return
+    }
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const status = await call(window.api.minecraft.status(server.name, server.zone))
+        if (!cancelled) setPlayers(status.playerCount)
+      } catch {
+        // 伺服器啟動過程中 RCON 還沒就緒，這是正常過渡狀態
+      }
+    }
+    void load()
+    const timer = setInterval(() => void load(), 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [running, server.name, server.zone])
 
   const power = async (action: 'start' | 'stop'): Promise<void> => {
     setBusy(true)
@@ -69,81 +101,100 @@ export default function ServerDetail({
 
   const copyAddress = async (): Promise<void> => {
     if (!server.externalIp) return
-    await navigator.clipboard.writeText(`${server.externalIp}:${REMOTE.gamePort}`)
+    // Minecraft 的預設埠就是 25565，玩家不需要打出來
+    await navigator.clipboard.writeText(server.externalIp)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   return (
-    <div className="page">
-      <div className="detail-head">
-        <button type="button" className="link" onClick={onBack}>
-          ← {t('common.back')}
+    <>
+      <div style={{ padding: '22px 33px 0' }}>
+        <button type="button" className="bare" onClick={onBack}>
+          <Back /> {t('common.back')}
         </button>
+      </div>
 
-        <div className="detail-title">
-          <StatusDot state={server.state} />
+      <div className="console">
+        <div className="aside">
+          <WorldBlock size={66} lit={running} />
+
           <h2>{server.displayName}</h2>
-          <span className="muted small">
-            Minecraft {server.mcVersion} · {server.machineType} · {server.zone}
-          </span>
-        </div>
+          <div className="who">
+            {running
+              ? players === null
+                ? t('console.starting')
+                : t('list.playing', { count: players })
+              : t(`state.${server.state}`)}
+          </div>
 
-        <div className="detail-actions">
           {server.externalIp && (
-            <button type="button" className="address" onClick={() => void copyAddress()}>
-              {copied ? t('common.copied') : `${server.externalIp}:${REMOTE.gamePort}`}
+            <button
+              type="button"
+              className="addr fact bare"
+              title={t('list.copyAddress')}
+              onClick={() => void copyAddress()}
+            >
+              {copied ? t('common.copied') : server.externalIp}
             </button>
           )}
-          <button
-            type="button"
-            className="primary"
-            disabled={busy || transitioning}
-            onClick={() => void power(running ? 'stop' : 'start')}
-          >
-            {transitioning
-              ? t(`state.${server.state}`)
-              : running
-                ? t('detail.shutdown')
-                : t('detail.boot')}
-          </button>
-          <button type="button" className="link danger" disabled={busy} onClick={() => void remove()}>
-            {t('detail.delete')}
-          </button>
+
+          <dl>
+            <dt>{t('detail.version')}</dt>
+            <dd className="fact">{server.mcVersion}</dd>
+            <dt>{t('detail.machine')}</dt>
+            <dd className="fact">{server.machineType}</dd>
+            <dt>{t('detail.zone')}</dt>
+            <dd className="fact">{server.zone}</dd>
+          </dl>
+
+          <div className="power">
+            <button
+              type="button"
+              className={running ? '' : 'torch'}
+              disabled={busy || moving}
+              onClick={() => void power(running ? 'stop' : 'start')}
+            >
+              {moving ? t(`state.${server.state}`) : running ? t('detail.shutdown') : t('detail.boot')}
+            </button>
+            <button type="button" className="link-btn danger" disabled={busy} onClick={() => void remove()}>
+              {t('detail.delete')}
+            </button>
+          </div>
+
+          {running && <p className="footnote">{t('detail.shutdownNote')}</p>}
+          <ErrorText>{message}</ErrorText>
+        </div>
+
+        <div className="work">
+          <Tabs
+            active={tab}
+            onChange={setTab}
+            tabs={[
+              { id: 'console', label: t('detail.tabs.console') },
+              { id: 'properties', label: t('detail.tabs.properties') },
+              { id: 'players', label: t('detail.tabs.players') },
+              { id: 'files', label: t('detail.tabs.files') },
+              { id: 'backups', label: t('detail.tabs.backups') }
+            ]}
+          />
+
+          {!running ? (
+            <div className="centered">
+              <p className="muted">{t('detail.needRunning')}</p>
+              <p className="muted small">{t('detail.needRunningHint')}</p>
+            </div>
+          ) : (
+            <>
+              {tab === 'console' && <ConsoleTab server={server} />}
+              {tab === 'properties' && <PropertiesTab server={server} />}
+              {tab === 'players' && <PlayersTab server={server} />}
+              {tab === 'files' && <FilesTab server={server} />}
+              {tab === 'backups' && <BackupsTab server={server} />}
+            </>
+          )}
         </div>
       </div>
-
-      {running && <p className="muted small">{t('detail.shutdownNote')}</p>}
-      <ErrorText>{message}</ErrorText>
-
-      <Tabs
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'console', label: t('detail.tabs.console') },
-          { id: 'properties', label: t('detail.tabs.properties') },
-          { id: 'players', label: t('detail.tabs.players') },
-          { id: 'files', label: t('detail.tabs.files') },
-          { id: 'backups', label: t('detail.tabs.backups') }
-        ]}
-      />
-
-      <div className="card">
-        {!running && tab !== 'console' ? (
-          <div className="empty">
-            <p>{t('detail.needRunning')}</p>
-            <p className="muted small">{t('detail.needRunningHint')}</p>
-          </div>
-        ) : (
-          <>
-            {tab === 'console' && <ConsoleTab server={server} />}
-            {tab === 'properties' && <PropertiesTab server={server} />}
-            {tab === 'players' && <PlayersTab server={server} />}
-            {tab === 'files' && <FilesTab server={server} />}
-            {tab === 'backups' && <BackupsTab server={server} />}
-          </>
-        )}
-      </div>
-    </div>
+    </>
   )
 }

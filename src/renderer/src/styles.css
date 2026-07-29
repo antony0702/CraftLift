@@ -1,20 +1,74 @@
-/* CraftLift 介面樣式。
-   深色系：Minecraft 玩家多半在晚上開服，深色比較不刺眼。
-   目前以「清楚可用」為目標，正式美術之後再統一調整。 */
+/* ═══════════════════════════════════════════════════════════════
+   CraftLift 設計系統
 
-:root {
-  --bg: #12141a;
-  --surface: #1a1d26;
-  --surface-raised: #232733;
-  --border: #2f3441;
-  --text: #e8eaf0;
-  --text-muted: #9aa2b5;
-  --accent: #4ade80;
-  --accent-hover: #22c55e;
-  --accent-ink: #05240f;
-  --danger: #f87171;
-  --warn: #fbbf24;
-  --radius: 12px;
+   概念：Minecraft 的亮度是離散的 0–15 級，光會呈現斷層。執行中的
+   世界在下方投出階梯狀的光池，關機的是一塊冷石頭——狀態不需要
+   文字就讀得出來。光源是方塊底部的地核，那個橘色就是介面的強調色。
+
+   兩條貫穿全域的規則：
+   1. 字級鎖在 11 的倍數。Cubic 11 是 11×11 的點陣字，只有在 11、22、
+      33、44 時每個像素才對齊螢幕格點；其他尺寸會糊掉且筆畫不均。
+      間距也一律用 11 的倍數，整個介面因此對齊同一張格線。
+   2. 點陣字用於「人講的話」，等寬字用於「機器產生的事實」——IP、
+      版本、時間戳、金額、日誌。這是規則，不是美術偏好。
+
+   橘色的預算只有兩處：光，和主要動作。其餘一律石頭色。
+   ═══════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Cubic 11';
+  src: url('./assets/fonts/Cubic_11.woff2') format('woff2');
+  font-display: block;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./assets/fonts/JetBrainsMono.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* ── 色票 ───────────────────────────────────────────────────── */
+:root,
+:root[data-theme='dark'] {
+  --void: #0e0b08;
+  --stone-900: #17120d;
+  --stone-800: #1f1913;
+  --stone-700: #2a2219;
+  --edge: #372c21;
+  --edge-soft: #241d16;
+  --bone: #f0e6d8;
+  --dust: #8d7e6c;
+  --torch: #e07a2f;
+  --torch-hot: #ffc078;
+  --torch-ink: #180a01;
+  --ember: #d4553a;
+  --dead-top: #3d3d3d;
+  --dead-right: #303030;
+  --dead-left: #242424;
+  --dead-land: #4a4a4a;
+  --halo-1: rgba(224, 122, 47, 0.42);
+  --halo-2: rgba(224, 122, 47, 0.2);
+  --halo-3: rgba(224, 122, 47, 0.08);
+}
+:root[data-theme='light'] {
+  --void: #bfb6a5;
+  --stone-900: #d4cdbf;
+  --stone-800: #e2dbd0;
+  --stone-700: #eee8de;
+  --edge: #a99a84;
+  --edge-soft: #c6bcab;
+  --bone: #1d1710;
+  --dust: #6a5e4d;
+  --torch: #b85e17;
+  --torch-hot: #8a4009;
+  --torch-ink: #fff4e8;
+  --ember: #97301b;
+  --dead-top: #a8a196;
+  --dead-right: #8d8679;
+  --dead-left: #746d61;
+  --dead-land: #b8b1a6;
+  --halo-1: rgba(184, 94, 23, 0.45);
+  --halo-2: rgba(184, 94, 23, 0.22);
+  --halo-3: rgba(184, 94, 23, 0.09);
 }
 
 * {
@@ -23,804 +77,927 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Segoe UI', 'Microsoft JhengHei', system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
+  background: var(--stone-900);
+  color: var(--bone);
+  font-family: 'Cubic 11', 'Microsoft JhengHei', sans-serif;
+  /* 11px 是這套點陣字的原生尺寸。22px 以上只用於強調與標題——
+     整個介面都用 22px 會大得像簡報，那是先前的錯誤。 */
+  font-size: 11px;
+  line-height: 22px;
+  /* 點陣字關掉次像素平滑才銳利 */
+  -webkit-font-smoothing: none;
   user-select: none;
 }
 
-input,
-select,
-textarea,
-button {
-  font-family: inherit;
-  font-size: inherit;
-}
-
-input,
-select,
-textarea {
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 11px;
-  width: 100%;
+/* 機器產生的事實 */
+.fact {
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.02em;
   user-select: text;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
+/* ── 捲軸 ─────────────────────────────────────────────────────
+   Windows 原生捲軸是圓角淺灰的，跟這套硬邊像素語彙格格不入。
+   自己畫一支：方形、無圓角、寬度用 11px 對齊格線。
+   一旦覆寫 ::-webkit-scrollbar，系統捲軸就完全不會出現。 */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--stone-800);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--edge);
+  /* 用邊框在滑塊兩側留出軌道色的細縫，滑塊才不會貼滿整條軌道 */
+  border-left: 2px solid var(--stone-800);
+  border-right: 2px solid var(--stone-800);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dust);
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--torch);
+}
+::-webkit-scrollbar-corner {
+  background: var(--stone-800);
+}
+/* 預設的上下箭頭在深色底上是兩個空白方塊，比沒有還醜 */
+::-webkit-scrollbar-button {
+  display: none;
 }
 
-button {
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
+/* 日誌永遠是深色的，它的捲軸也要跟著深，不能用主題色 */
+.log::-webkit-scrollbar-track,
+.log::-webkit-scrollbar-corner {
+  background: #14100b;
+}
+.log::-webkit-scrollbar-thumb {
+  background: #3a3129;
+  border-left-color: #14100b;
+  border-right-color: #14100b;
+}
+.log::-webkit-scrollbar-thumb:hover {
+  background: #5c4e40;
 }
 
-button:hover:not(:disabled) {
-  border-color: var(--accent);
+/* ── 排版基礎 ───────────────────────────────────────────────── */
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: normal;
+  letter-spacing: 0.04em;
 }
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+h1 {
+  font-size: 33px;
+  line-height: 44px;
 }
-
-button.primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: none;
-  font-weight: 700;
-  padding: 10px 20px;
+h2 {
+  font-size: 22px;
+  line-height: 33px;
 }
-
-button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+h3 {
+  font-size: 22px;
+  line-height: 33px;
 }
-
-button.link {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  padding: 6px 2px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+p {
+  margin: 0 0 11px;
 }
-
-button.link:hover {
-  color: var(--text);
+.muted {
+  color: var(--dust);
 }
-
-button.link.active {
-  color: var(--accent);
+.small {
+  font-size: 11px;
+  line-height: 22px;
 }
-
-button.link.inline {
-  padding: 0;
-  font-size: inherit;
+/* 需要強調的內文 */
+.lead {
+  font-size: 22px;
+  line-height: 33px;
 }
-
-button.link.danger,
-.danger-button {
-  color: var(--danger);
-}
-
-.danger-button {
-  background: none;
-  border: 1px solid var(--danger);
-  font-weight: 600;
-}
-
-.danger-button:hover:not(:disabled) {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: var(--danger);
-}
-
-.icon-button {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  padding: 4px 8px;
-}
-
-/* ---------- 版面 ---------- */
-
-.app {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 24px 28px 60px;
-}
-
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page.narrow {
-  max-width: 640px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.spacer {
+.grow {
   flex: 1;
 }
-
-.center {
-  text-align: center;
-}
-
 .nowrap {
   white-space: nowrap;
 }
-
-/* ---------- 頁首 ---------- */
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+.footnote {
+  font-size: 9px;
+  line-height: 18px;
+  color: var(--dust);
+}
+.eyebrow {
+  font-size: 11px;
+  line-height: 22px;
+  letter-spacing: 0.12em;
+  color: var(--dust);
+}
+.error {
+  color: var(--ember);
+  font-size: 11px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  background: none;
-  border: none;
-  padding: 0;
-  text-align: left;
+/* ── 表單 ───────────────────────────────────────────────────── */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 22px;
+  padding: 11px;
+  width: 100%;
+  background: var(--stone-800);
+  color: var(--bone);
+  border: 1px solid var(--edge);
+  border-radius: 0;
+  user-select: text;
 }
-
-.brand:hover {
-  border: none;
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--torch);
+  outline-offset: -1px;
 }
-
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), #16a34a);
-  flex-shrink: 0;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 21px;
-}
-
-.tagline {
-  margin: 1px 0 0;
-  color: var(--text-muted);
-  font-size: 12.5px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.lang-select {
-  width: auto;
-  padding: 6px 10px;
-  font-size: 13px;
-}
-
-/* ---------- 卡片 ---------- */
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.card h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.muted {
-  color: var(--text-muted);
-}
-
-.small {
-  font-size: 13px;
-}
-
-.label,
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
+input::placeholder {
+  color: var(--dust);
 }
 
 .field {
   display: block;
-  margin: 16px 0;
+  margin: 22px 0;
 }
-
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--dust);
+  margin-bottom: 4px;
+}
 .checkbox {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  margin: 10px 0;
+  gap: 11px;
+  margin: 11px 0;
   cursor: pointer;
+  font-size: 11px;
+  line-height: 22px;
 }
-
 .checkbox input {
   width: auto;
   margin-top: 4px;
   flex-shrink: 0;
+  accent-color: var(--torch);
 }
-
 .inline-form {
   display: flex;
-  gap: 8px;
+  gap: 11px;
 }
-
 .inline-form input {
   flex: 1;
+  min-width: 0;
 }
 
-.inline-form button {
-  white-space: nowrap;
+/* ── 按鈕 ───────────────────────────────────────────────────── */
+button {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--bone);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 0;
+  padding: 11px 22px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: var(--stone-700);
+}
+button:focus-visible {
+  outline: 2px solid var(--torch);
+  outline-offset: 2px;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+button.torch {
+  background: var(--torch);
+  border-color: var(--torch);
+  color: var(--torch-ink);
+}
+button.torch:hover:not(:disabled) {
+  background: var(--torch-hot);
+  border-color: var(--torch-hot);
+}
+button.bare {
+  border-color: transparent;
+  color: var(--dust);
+  padding: 11px 0;
+}
+button.bare:hover:not(:disabled) {
+  background: none;
+  color: var(--bone);
+}
+button.small {
+  font-size: 11px;
+  line-height: 11px;
+  padding: 9px 14px;
+}
+/* 主要動作按鈕。11px 對「進入管理」「建立新伺服器」這種決定性操作
+   太不起眼，這是少數該用 22px 的地方。 */
+button.big {
+  font-size: 22px;
+  line-height: 33px;
+  padding: 11px 33px;
+}
+button.danger {
+  border-color: var(--ember);
+  color: var(--ember);
+}
+button.danger:hover:not(:disabled) {
+  background: var(--ember);
+  color: var(--torch-ink);
 }
 
-.advanced {
-  border-left: 2px solid var(--border);
-  padding-left: 16px;
-  margin: 12px 0;
+.icon-btn {
+  width: 33px;
+  height: 33px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--dust);
+}
+.icon-btn:hover:not(:disabled) {
+  background: none;
+  color: var(--bone);
+}
+.icon-btn[aria-pressed='true'] {
+  color: var(--torch);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 20px;
+  gap: 11px;
+  margin-top: 22px;
   flex-wrap: wrap;
 }
 
-.badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(74, 222, 128, 0.12);
-  color: var(--accent);
-  font-size: 12px;
+/* ── 外框與視窗列 ─────────────────────────────────────────────
+   版面完全流動：內容跟著視窗填滿，不留死白。
+   字級不隨視窗縮放——點陣字只在 11 的倍數下銳利，平滑縮放會讓它糊掉。
+   要整體放大縮小請用設定裡的「介面大小」，那走的是對點陣字友善的級距。 */
+.app {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--stone-900);
 }
-
-.badge.warn {
-  background: rgba(251, 191, 36, 0.12);
-  color: var(--warn);
-}
-
-.error {
-  color: var(--danger);
-  font-size: 13px;
-  word-break: break-word;
-  user-select: text;
-  white-space: pre-wrap;
-}
-
-.notice {
-  border: 1px solid var(--warn);
-  background: rgba(251, 191, 36, 0.08);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-}
-
-.empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-}
-
-/* ---------- 說明泡泡 ---------- */
-
-.info-icon {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  border: 1px solid var(--text-muted);
-  color: var(--text-muted);
-  font-size: 10px;
-  font-style: italic;
-  cursor: help;
-  flex-shrink: 0;
-}
-
-.info-bubble {
-  display: none;
-  position: absolute;
-  bottom: 140%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 270px;
-  padding: 10px 12px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text);
-  font-size: 12.5px;
-  font-style: normal;
-  line-height: 1.5;
-  text-align: left;
-  z-index: 20;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.info-icon:hover .info-bubble,
-.info-icon:focus .info-bubble {
-  display: block;
-}
-
-/* ---------- 指令方塊 ---------- */
-
-.command-row {
+.bar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 11px;
+  height: 55px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--edge-soft);
 }
-
-.command-row code,
-code.path,
-code.ip {
-  background: #0d0f14;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 12.5px;
-  color: #a5d6ff;
-  user-select: text;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-.command-row code {
-  flex: 1;
-}
-
-.command-row button {
-  min-width: 52px;
-}
-
-/* ---------- 方案卡片 ---------- */
-
-.tier-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.tier-card {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 14px 12px;
-  text-align: left;
-  background: var(--surface-raised);
-}
-
-.tier-card.selected {
-  border-color: var(--accent);
-  background: rgba(74, 222, 128, 0.08);
-}
-
-.tier-spec {
-  font-size: 12px;
-  color: var(--accent);
-  margin-top: 4px;
-}
-
-.disclaimer {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
-  margin-top: 20px;
-  background: var(--surface-raised);
-}
-
-/* ---------- 預設／自訂切換 ---------- */
-
-.segmented {
-  display: flex;
-  gap: 0;
-  margin: 14px 0 6px;
-}
-
-.segmented button {
-  flex: 1;
-  border-radius: 0;
-}
-
-.segmented button:first-child {
-  border-radius: 8px 0 0 8px;
-}
-
-.segmented button:last-child {
-  border-radius: 0 8px 8px 0;
-  border-left: none;
-}
-
-.segmented button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
-  font-weight: 700;
-}
-
-/* ---------- 費用估算 ---------- */
-
-.estimate {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  margin-top: 20px;
-}
-
-.estimate-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.estimate-head .field-label {
-  margin-bottom: 0;
-}
-
-.estimate-figures {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 12px 0;
-}
-
-.estimate-figures div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 10px 12px;
-  background: var(--surface-raised);
-  border-radius: 8px;
-}
-
-.estimate-figures strong {
-  font-size: 19px;
-  color: var(--accent);
-}
-
-/* 免責文字必須緊貼著數字，分開放就失去意義 */
-.estimate-disclaimer {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 12px;
-  margin-bottom: 6px;
-}
-
-/* ---------- 伺服器清單 ---------- */
-
-.server-list {
-  list-style: none;
-  margin: 0;
+.bar .wordmark {
+  font-size: 22px;
+  letter-spacing: 0.1em;
+  background: none;
+  border: none;
+  color: var(--bone);
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.server-row {
-  display: flex;
   align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 16px;
-  text-align: left;
-  background: var(--surface-raised);
+  gap: 11px;
+}
+.bar .wordmark:hover {
+  background: none;
+}
+/* 版本號用等寬字：它是機器產生的事實，跟 IP、時間戳同一類 */
+.version {
+  font-size: 11px;
+  color: var(--dust);
+  letter-spacing: 0;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+.screen {
+  padding: 33px 44px 44px;
+}
+/* 讀起來舒服的行長有上限，所以表單類畫面仍然限寬並置中 */
+.screen.narrow {
+  max-width: 682px;
+  margin: 0 auto;
+}
+.sep {
+  height: 1px;
+  background: var(--edge-soft);
 }
 
-.server-main {
-  display: flex;
+/* ── 世界方塊與地面光池 ──────────────────────────────────────
+   光不打在空氣裡，而是落在方塊下方的地面上。試過方形與圓形的光環：
+   硬邊環套在方形物件外圍必然被讀成相框，不管多寬多淡。不對稱的
+   光池才讀得出是「在發光」。分階保留，因為 Minecraft 的亮度是離散的。 */
+.stage {
+  display: inline-flex;
   flex-direction: column;
-  flex: 1;
-}
-
-.server-side {
-  display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
   flex-shrink: 0;
 }
-
-.dot.ok {
-  background: var(--accent);
+.world {
+  display: block;
+  line-height: 0;
 }
-
-.dot.off {
-  background: var(--text-muted);
-}
-
-.dot.busy {
-  background: var(--warn);
-}
-
-/* ---------- 伺服器詳細頁 ---------- */
-
-.detail-head {
+.pool {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: -4px;
+}
+.pool i {
+  display: block;
+  height: 6px;
+}
+.pool i:nth-child(1) {
+  width: 104%;
+  background: var(--halo-1);
+}
+.pool i:nth-child(2) {
+  width: 78%;
+  background: var(--halo-2);
+}
+.pool i:nth-child(3) {
+  width: 50%;
+  background: var(--halo-2);
+}
+.pool i:nth-child(4) {
+  width: 26%;
+  background: var(--halo-3);
 }
 
-.detail-title {
+/* ── 伺服器清單：每一台都用同一種版面 ─────────────────────────
+   先前把執行中的那台放大成主角、其餘縮成一行，同一份資訊在兩種尺寸下
+   呈現，看起來像壞掉而不是有層次。狀態的差異交給世界方塊表達就夠了。 */
+.world-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 55px;
+  padding: 33px 0;
+  border-bottom: 1px solid var(--edge-soft);
   flex-wrap: wrap;
 }
-
-.detail-title h2 {
-  margin: 0;
-  font-size: 20px;
+.world-row .stage {
+  padding: 11px 33px;
 }
-
-.detail-actions {
+.world-info {
+  flex: 1;
+  min-width: 0;
+}
+.world-info .who {
+  color: var(--dust);
+  margin-top: 6px;
+}
+/* 位址是要傳給朋友的東西，給它應有的份量。點一下複製。 */
+.world-info .addr {
+  display: inline-block;
+  margin-top: 22px;
+  padding: 0 0 6px;
+  font-size: 17px;
+  color: var(--bone);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--edge);
+}
+.world-info .addr:hover {
+  background: none;
+  border-bottom-color: var(--torch);
+  color: var(--torch);
+}
+.world-info .spec {
+  display: block;
+  color: var(--dust);
+  margin-top: 14px;
+}
+.world-info .acts {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 11px;
+  margin-top: 22px;
 }
 
-.address {
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 13px;
-  color: var(--accent);
-  background: rgba(74, 222, 128, 0.08);
-  border-color: rgba(74, 222, 128, 0.3);
+/* ── 主控台：左欄是什麼，右欄正在發生什麼 ──────────────────── */
+.console {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  align-items: start;
+}
+/* 視窗太窄時左右兩欄疊成上下，右欄的日誌才不會被擠到不能看 */
+@media (max-width: 780px) {
+  .console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aside {
+    border-right: none;
+    border-bottom: 1px solid var(--edge-soft);
+  }
+}
+.aside {
+  padding: 33px;
+  border-right: 1px solid var(--edge-soft);
+  min-height: 100%;
+}
+.aside .stage {
+  margin-bottom: 33px;
+}
+.aside .who {
+  font-size: 11px;
+  color: var(--dust);
+  margin-top: 6px;
+}
+.aside .addr {
+  display: block;
+  font-size: 15px;
+  margin-top: 22px;
+  color: var(--bone);
+  word-break: break-all;
+}
+.aside dl {
+  margin: 22px 0 0;
+  font-size: 11px;
+  line-height: 22px;
+}
+.aside dt {
+  color: var(--dust);
+}
+.aside dd {
+  margin: 0 0 11px;
+  color: var(--bone);
+}
+.aside .power {
+  margin-top: 33px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.work {
+  padding: 22px 33px 33px;
+  min-width: 0;
 }
 
 .tabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
+  gap: 22px;
+  border-bottom: 1px solid var(--edge-soft);
+  margin-bottom: 22px;
+  flex-wrap: wrap;
 }
-
 .tab {
+  font-size: 11px;
+  line-height: 22px;
+  padding: 11px 0 13px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  border-radius: 0;
-  color: var(--text-muted);
-  padding: 10px 14px;
+  color: var(--dust);
 }
-
-.tab:hover {
-  border-color: transparent;
-  color: var(--text);
-}
-
-.tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-/* ---------- 主控台 ---------- */
-
-.console-bar,
-.files-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.log {
-  background: #0d0f14;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
-  height: 380px;
-  overflow: auto;
-  margin: 0;
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #cbd5e1;
-  white-space: pre-wrap;
-  word-break: break-word;
-  user-select: text;
-}
-
-.command-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.command-bar .prompt {
-  color: var(--accent);
-  font-family: 'Cascadia Mono', Consolas, monospace;
-}
-
-/* ---------- 檔案表格 ---------- */
-
-.file-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-
-.file-table td {
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--border);
-}
-
-.file-name {
+.tab:hover:not(:disabled) {
   background: none;
-  border: none;
-  color: var(--text);
-  padding: 0;
-  text-align: left;
+  color: var(--bone);
+}
+.tab[aria-selected='true'] {
+  color: var(--bone);
+  border-bottom-color: var(--bone);
 }
 
-.file-name:hover {
-  color: var(--accent);
-  border: none;
+/* ── 玩家 ───────────────────────────────────────────────────── */
+.roster {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
 }
-
-.editor {
-  height: 380px;
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 12.5px;
-  resize: vertical;
-  white-space: pre;
+.roster .k {
+  font-size: 11px;
+  color: var(--dust);
+  letter-spacing: 0.2em;
 }
-
-/* ---------- 玩家名單 ---------- */
-
-.player-section {
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
+.roster .p {
+  font-size: 13px;
 }
-
-.player-section h3 {
-  margin: 0 0 2px;
-  font-size: 15px;
-}
-
-.chip-list {
+.chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 11px;
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: 11px 0 0;
 }
-
 .chip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 12px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--edge);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+.chip button {
+  border: none;
+  padding: 0 4px;
+  color: var(--dust);
   font-size: 13px;
 }
+.chip button:hover {
+  background: none;
+  color: var(--ember);
+}
+.player-section {
+  padding: 22px 0;
+  border-top: 1px solid var(--edge-soft);
+}
+.player-section h3 {
+  margin-bottom: 4px;
+}
 
-.chip button {
+/* ── 日誌：永遠深色，不跟隨主題 ──────────────────────────────
+   終端機本來就是暗的，長時間盯著淺底深字明顯較累。刻意的例外。 */
+.log {
+  background: #14100b;
+  border: 1px solid var(--edge);
+  padding: 14px 16px;
+  height: clamp(220px, 42vh, 560px);
+  overflow: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 20px;
+  color: #a2b1a9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  user-select: text;
+}
+.prompt {
+  display: flex;
+  margin-top: 11px;
+  border: 1px solid var(--edge);
+}
+.prompt .slash {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  color: var(--dust);
+  font-family: 'JetBrains Mono', monospace;
+  border-right: 1px solid var(--edge);
+  flex-shrink: 0;
+}
+.prompt input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  font-size: 11px;
+}
+.prompt input:focus {
+  outline: none;
+  background: var(--stone-800);
+}
+.prompt button {
+  border: none;
+  border-left: 1px solid var(--edge);
+  flex-shrink: 0;
+}
+
+/* ── 表格：檔案與備份 ───────────────────────────────────────── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  line-height: 22px;
+}
+.table td,
+.table th {
+  padding: 6px 11px 6px 0;
+  border-bottom: 1px solid var(--edge-soft);
+  text-align: left;
+}
+.table th {
+  color: var(--dust);
+  font-weight: normal;
+}
+.link-btn {
   background: none;
   border: none;
-  color: var(--text-muted);
-  padding: 0 4px;
+  padding: 0 11px 0 0;
+  font-size: 11px;
+  color: var(--dust);
 }
-
-.chip button:hover {
-  color: var(--danger);
+.link-btn:hover:not(:disabled) {
+  background: none;
+  color: var(--bone);
+}
+.link-btn.danger {
+  color: var(--dust);
   border: none;
 }
+.link-btn.danger:hover:not(:disabled) {
+  background: none;
+  color: var(--ember);
+}
+.file-name {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--bone);
+  text-align: left;
+}
+.file-name:hover {
+  background: none;
+  color: var(--torch);
+}
+.path {
+  font-size: 11px;
+  color: var(--dust);
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  user-select: text;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 11px;
+  flex-wrap: wrap;
+}
 
-/* ---------- 對話框 ---------- */
+/* ── 提示與空狀態 ───────────────────────────────────────────── */
+.notice {
+  border-left: 3px solid var(--torch);
+  padding: 0 0 0 14px;
+  margin-bottom: 22px;
+}
+.blank {
+  padding: 66px 44px;
+  text-align: center;
+}
+.blank .stage {
+  margin-bottom: 33px;
+  opacity: 0.5;
+}
+.blank p {
+  font-size: 22px;
+  line-height: 33px;
+}
+.disclaimer {
+  border: 1px solid var(--edge);
+  padding: 22px;
+  margin-top: 33px;
+}
 
-.modal-backdrop {
+/* ── 方案卡片 ───────────────────────────────────────────────── */
+.tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+}
+.tier {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 22px 14px;
+  text-align: left;
+}
+.tier[aria-pressed='true'] {
+  border-color: var(--torch);
+  background: var(--stone-700);
+}
+.tier b {
+  font-size: 22px;
+  font-weight: normal;
+  line-height: 33px;
+}
+.tier .spec {
+  font-size: 11px;
+  color: var(--dust);
+}
+.segmented {
+  display: flex;
+  margin: 11px 0;
+}
+.segmented button {
+  flex: 1;
+}
+.segmented button + button {
+  border-left: none;
+}
+.segmented button[aria-pressed='true'] {
+  background: var(--torch);
+  border-color: var(--torch);
+  color: var(--torch-ink);
+}
+.advanced {
+  border-left: 1px solid var(--edge);
+  padding-left: 22px;
+  margin: 22px 0;
+}
+
+/* ── 費用估算 ───────────────────────────────────────────────── */
+.estimate {
+  border: 1px solid var(--edge);
+  padding: 22px;
+  margin-top: 33px;
+}
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin: 22px 0;
+}
+.figures div {
+  display: flex;
+  flex-direction: column;
+}
+.figures b {
+  font-size: 22px;
+  line-height: 33px;
+  font-weight: normal;
+  color: var(--torch-hot);
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+.figures span {
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--dust);
+}
+.estimate .fine {
+  border-top: 1px solid var(--edge-soft);
+  padding-top: 11px;
+  margin-top: 11px;
+}
+
+/* ── 說明泡泡 ───────────────────────────────────────────────── */
+/* 「i」會掉出方框，原因是它繼承了 body 的 line-height: 22px——
+   22px 的行框塞在 14px 的盒子裡，字自然被推到底部甚至溢位。
+   line-height: 1 讓行框收合到字身高度，才置中得起來。
+   泡泡本身另外指定行高，不受這裡影響。 */
+.info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  line-height: 1;
+  font-size: 11px;
+  /* 行內使用時（例如夾在核取方塊的文字中）跟周圍文字的視覺中線對齊 */
+  vertical-align: -3px;
+  border: 1px solid var(--dust);
+  color: var(--dust);
+  cursor: help;
+  flex-shrink: 0;
+  user-select: none;
+}
+.info:hover,
+.info:focus-visible {
+  border-color: var(--bone);
+  color: var(--bone);
+}
+/* 泡泡從圖示左緣往右展開，不置中。
+   info 圖示幾乎都貼在欄位標籤的左側，置中展開會讓一半跑到視窗外被切掉。 */
+.info span {
+  display: none;
+  position: absolute;
+  bottom: 150%;
+  left: -4px;
+  width: max-content;
+  max-width: 297px;
+  padding: 11px;
+  background: var(--stone-700);
+  border: 1px solid var(--edge);
+  color: var(--bone);
+  font-size: 11px;
+  line-height: 22px;
+  text-align: left;
+  z-index: 20;
+}
+.info:hover span,
+.info:focus span {
+  display: block;
+}
+
+/* ── 對話框 ─────────────────────────────────────────────────── */
+.backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
   display: grid;
   place-items: center;
   z-index: 50;
-  padding: 24px;
+  padding: 33px;
 }
-
 .modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  width: min(760px, 100%);
+  background: var(--stone-800);
+  border: 1px solid var(--edge);
+  padding: 22px;
+  width: min(792px, 100%);
   max-height: 88vh;
   overflow: auto;
 }
-
 .modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 11px;
+  margin-bottom: 11px;
+}
+.editor {
+  height: clamp(240px, 46vh, 600px);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 20px;
+  resize: vertical;
+  white-space: pre;
+  -webkit-font-smoothing: antialiased;
 }
 
-.modal-head h3 {
-  margin: 0;
-  font-size: 14px;
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  color: var(--text-muted);
-  word-break: break-all;
+/* ── 等待：逐格四階，跟光同一套語言 ─────────────────────────── */
+.waiting {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
 }
-
-/* ---------- 載入中 ---------- */
-
+.waiting i {
+  width: 8px;
+  height: 8px;
+  background: var(--torch);
+  animation: step 1s steps(1) infinite;
+}
+.waiting i:nth-child(2) {
+  animation-delay: 0.25s;
+}
+.waiting i:nth-child(3) {
+  animation-delay: 0.5s;
+}
+.waiting i:nth-child(4) {
+  animation-delay: 0.75s;
+}
+@keyframes step {
+  0%,
+  24% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0.18;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .waiting i {
+    animation: none;
+    opacity: 1;
+  }
+}
 .centered {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 11px;
+  padding: 44px 0;
   text-align: center;
-  gap: 6px;
-  padding: 28px 0;
 }
 
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 8px;
+/* ── 指令方塊（安裝引導用）─────────────────────────────────── */
+.command {
+  display: flex;
+  gap: 11px;
+  margin: 11px 0;
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.command code {
+  flex: 1;
+  background: var(--void);
+  border: 1px solid var(--edge);
+  padding: 11px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--torch-hot);
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+  user-select: text;
 }

@@ -1,10 +1,11 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   Backup,
   BillingAccount,
   CreateServerOptions,
+  FeedbackInput,
   MachineType,
   McVersion,
   MinecraftServer,
@@ -16,6 +17,8 @@ import type {
   ServerProperties
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
+import { applyZoom } from './zoom'
+import { feedbackFormUrl, submitFeedback } from './feedback'
 import { getGcloudStatus } from './gcloud/exec'
 import { getAuthStatus, login } from './gcloud/auth'
 import {
@@ -40,7 +43,12 @@ import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
 import type { ServerConnection } from './server/ssh'
 import * as ops from './server/operations'
-import { defaultLocalBackupDir, getPreferences, setPreferences } from './preferences'
+import {
+  defaultLocalBackupDir,
+  effectiveTheme,
+  getPreferences,
+  setPreferences
+} from './preferences'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -98,14 +106,37 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   // --- 專案 -----------------------------------------------------------------
   handle('project:billingAccounts', async (): Promise<BillingAccount[]> => listBillingAccounts())
 
+  /**
+   * 目前使用的專案。
+   *
+   * 查詢 GCP 要四秒多，每次啟動都等太久，所以先回傳上次記住的值讓畫面
+   * 立刻出來，再在背景向 GCP 核對。核對結果不同時更新快取——下次啟動
+   * 就會是對的。真正的來源始終是 GCP 上的標籤，這裡只是加速。
+   */
   handle('project:current', async (): Promise<string | null> => {
+    if (currentProjectId) return currentProjectId
+
+    const prefs = await getPreferences()
+    if (prefs.lastProjectId) {
+      currentProjectId = prefs.lastProjectId
+      void findExistingProject().then(async (actual) => {
+        if (actual !== prefs.lastProjectId) {
+          currentProjectId = actual
+          await setPreferences({ lastProjectId: actual })
+        }
+      })
+      return currentProjectId
+    }
+
     currentProjectId = await findExistingProject()
+    if (currentProjectId) await setPreferences({ lastProjectId: currentProjectId })
     return currentProjectId
   })
 
   handle('project:ensure', async (billingAccountId: string): Promise<string> => {
     const project = await ensureProject(billingAccountId)
     currentProjectId = project.projectId
+    await setPreferences({ lastProjectId: project.projectId })
     return project.projectId
   })
 
@@ -114,6 +145,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     closeAllConnections()
     await deleteProject(projectId)
     currentProjectId = null
+    await setPreferences({ lastProjectId: null })
   })
 
   // --- Minecraft 版本 -------------------------------------------------------
@@ -316,14 +348,30 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   // --- 偏好設定與雜項 -------------------------------------------------------
   handle('prefs:get', getPreferences)
-  handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> =>
-    setPreferences(updates)
-  )
+  handle('prefs:set', async (updates: Partial<Preferences>): Promise<Preferences> => {
+    const next = await setPreferences(updates)
+    if (updates.uiScale !== undefined) applyZoom()
+    return next
+  })
+
+  /** 目前實際採用的配色。設定為「跟隨系統」時，這裡回傳解析後的結果。 */
+  handle('theme:effective', async (): Promise<'light' | 'dark'> => effectiveTheme())
 
   handle('app:openExternal', async (url: string): Promise<void> => {
     // 只放行 https，避免畫面端被誘導去開本機檔案或執行檔
     if (!url.startsWith('https://')) throw new Error('只允許開啟 https 連結')
     await shell.openExternal(url)
+  })
+
+  /** 應用程式版本，顯示在標題列旁 */
+  handle('app:version', async (): Promise<string> => app.getVersion())
+
+  // --- 意見回饋 -------------------------------------------------------------
+  handle('feedback:send', async (input: FeedbackInput): Promise<void> => submitFeedback(input))
+
+  /** 直接送出失敗時的退路：開瀏覽器，內容已預先填好 */
+  handle('feedback:openForm', async (input: FeedbackInput): Promise<void> => {
+    await shell.openExternal(feedbackFormUrl(input))
   })
 
   handle('app:chooseDirectory', async (): Promise<string | null> => {

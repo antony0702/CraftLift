@@ -4,6 +4,7 @@ import type {
   Backup,
   BillingAccount,
   CreateServerOptions,
+  FeedbackInput,
   GcloudStatus,
   MachineType,
   McVersion,
@@ -175,7 +176,23 @@ const api = {
       invoke('prefs:set', updates),
     /** 只允許 https，主行程會再檢查一次 */
     openExternal: (url: string): Promise<Result<void>> => invoke('app:openExternal', url),
-    chooseDirectory: (): Promise<Result<string | null>> => invoke('app:chooseDirectory')
+    chooseDirectory: (): Promise<Result<string | null>> => invoke('app:chooseDirectory'),
+    /** 應用程式版本 */
+    version: (): Promise<Result<string>> => invoke('app:version'),
+    /** 送出意見回饋。失敗時回傳錯誤，呼叫端可改走 openFeedbackForm。 */
+    sendFeedback: (input: FeedbackInput): Promise<Result<void>> => invoke('feedback:send', input),
+    /** 開瀏覽器填表單，內容已預先填好。直接送出失敗時的退路。 */
+    openFeedbackForm: (input: FeedbackInput): Promise<Result<void>> =>
+      invoke('feedback:openForm', input),
+
+    /** 目前實際採用的配色（「跟隨系統」已解析成 light 或 dark） */
+    effectiveTheme: (): Promise<Result<'light' | 'dark'>> => invoke('theme:effective'),
+    /** 訂閱系統配色變化。回傳取消訂閱的函式。 */
+    onThemeChange: (handler: (theme: 'light' | 'dark') => void): (() => void) => {
+      const listener = (_e: unknown, theme: 'light' | 'dark'): void => handler(theme)
+      ipcRenderer.on('theme:changed', listener)
+      return () => ipcRenderer.removeListener('theme:changed', listener)
+    }
   }
 }
 

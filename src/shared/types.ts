@@ -146,9 +146,24 @@ export interface PlayerLists {
   banned: string[]
 }
 
+/** 介面配色。system 表示跟隨作業系統設定。 */
+export type ThemeChoice = 'light' | 'dark' | 'system'
+
 /** 應用程式偏好設定 */
 export interface Preferences {
   language: string
+  /** 使用者選的配色。實際採用哪一套要看 system 解析後的結果。 */
+  theme: ThemeChoice
+  /**
+   * 介面整體縮放。
+   *
+   * 'auto' 表示跟著視窗大小走——視窗變大，整個介面等比變大。
+   * 也可以指定固定倍率（1 = 100%）。
+   *
+   * 非 11 倍數的倍率會讓點陣字落在非整數位置而略微變糊，但實測觀感
+   * 影響很小，遠不如字太小或版面比例失衡來得難用。
+   */
+  uiScale: number | 'auto'
   /** 開機自動啟動。預設開啟，因為「到期前自動備份」需要 app 有在跑才能生效。 */
   launchAtLogin: boolean
   /** VM 上自動備份的間隔（小時） */
@@ -157,6 +172,24 @@ export interface Preferences {
   backupToLocalOnShutdown: boolean
   /** 本機備份存放位置，null 表示使用預設的「文件」資料夾 */
   localBackupDir: string | null
+  /**
+   * 上次使用的 GCP 專案，純粹是快取。
+   *
+   * 真正的來源仍然是 GCP 上帶有 craftlift 標籤的專案——這樣換電腦或
+   * 重灌後登入同一個帳號依然找得回來。但每次啟動都去查要四秒多，
+   * 所以先用記住的值讓畫面立刻出來，再在背景核對。
+   */
+  lastProjectId: string | null
+}
+
+/** 使用者填寫的意見回饋 */
+export interface FeedbackInput {
+  /** 必填 */
+  subject: string
+  /** 選填 */
+  name: string
+  /** 必填 */
+  body: string
 }
 
 /** 所有跨 IPC 操作的統一回傳格式。

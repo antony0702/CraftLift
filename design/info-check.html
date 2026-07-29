@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8" />
+<title>Info 圖示對位檢查</title>
+<!-- 直接載入正式樣式，字體路徑由 styles.css 自己相對解析 -->
+<link rel="stylesheet" href="../src/renderer/src/styles.css" />
+<style>
+  body { padding: 44px; }
+  .row { margin-bottom: 33px; padding-bottom: 22px; border-bottom: 1px solid var(--edge-soft); }
+  .zoom { zoom: 1.1; }
+  .tag { font-size: 11px; color: var(--dust); margin-bottom: 6px; }
+  /* 對照用：畫一條基準線看 i 有沒有壓在方框中央 */
+  .guide .info { outline: 1px dashed var(--torch); }
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="row">
+  <div class="tag">1 · 在欄位標籤裡（flex 容器）</div>
+  <label class="field">
+    <span class="field-label">
+      機器系列
+      <span class="info" tabindex="0">i<span>E2 便宜、適合大多數情況；N2／C3 單核效能較好。</span></span>
+    </span>
+    <input type="text" value="e2-standard-2" readonly />
+  </label>
+</div>
+
+<div class="row guide">
+  <div class="tag">2 · 加了虛線輔助框，確認 i 是否置中</div>
+  <span class="field-label">
+    介面大小
+    <span class="info" tabindex="0">i<span>整體放大縮小介面。</span></span>
+  </span>
+</div>
+
+<div class="row">
+  <div class="tag">3 · 在核取方塊的文字裡（行內排版）</div>
+  <label class="checkbox">
+    <input type="checkbox" checked />
+    <span>
+      開機時自動啟動 CraftLift
+      <span class="info" tabindex="0">i<span>建議保持開啟。到期前自動備份只有在程式執行時才生效。</span></span>
+    </span>
+  </label>
+</div>
+
+<div class="row zoom">
+  <div class="tag">4 · 110% 縮放下（實際預設值）</div>
+  <span class="field-label">
+    核心數（vCPU）
+    <span class="info" tabindex="0">i<span>超過 1 個時必須是偶數。</span></span>
+  </span>
+</div>
+
+<div class="row">
+  <div class="tag">5 · 連續多個，檢查基線是否一致</div>
+  <span class="field-label">
+    甲<span class="info">i<span>甲</span></span>　乙<span class="info">i<span>乙</span></span>　丙<span class="info">i<span>丙</span></span>
+  </span>
+</div>
+
+</body>
+</html>

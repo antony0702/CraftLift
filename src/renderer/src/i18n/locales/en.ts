@@ -8,6 +8,7 @@ export default {
     error: 'Something went wrong',
     retry: 'Retry',
     copied: 'Copied',
+    copy: 'Copy',
     cancel: 'Cancel',
     save: 'Save',
     saving: 'Saving…',
@@ -25,7 +26,11 @@ export default {
     UNKNOWN: 'Unknown'
   },
   setup: {
-    checking: 'Checking your environment…',
+    checking: {
+      account: 'Checking your Google account…',
+      billing: 'Looking up your billing accounts…',
+      slow: 'Google’s command-line tool takes a few seconds to start up each time. That is its normal speed, not a hang.'
+    },
     gcloudMissing: {
       title: 'Google Cloud CLI is required',
       desc: 'CraftLift drives your cloud account through Google’s official command-line tool. This way the sign-in flow never shows an “unverified app” warning, and there is no cap on how many people can use CraftLift.',
@@ -67,11 +72,14 @@ export default {
     }
   },
   list: {
-    loading: 'Loading your servers…',
-    title: 'My servers',
-    create: 'New server',
-    empty: 'No servers yet',
-    emptyHint: 'Press “New server” in the top right to get started.'
+    loading: 'Loading your worlds…',
+    title: 'Your worlds',
+    create: 'Create a server',
+    manage: 'Manage',
+    playing: '{{count}} playing',
+    empty: 'No servers here yet.',
+    emptyHint: 'Create one, send your friends the address, and you are playing together.',
+    copyAddress: 'Click to copy the address'
   },
   create: {
     defaultName: 'My server',
@@ -141,6 +149,9 @@ export default {
     shutdown: 'Shut down',
     boot: 'Start',
     delete: 'Delete server',
+    version: 'Version',
+    machine: 'Machine',
+    zone: 'Data centre',
     shutdownNote:
       'When you shut down, CraftLift first takes a backup and copies the world to your PC before stopping the machine.',
     needRunning: 'The machine is not running',
@@ -158,6 +169,8 @@ export default {
     machineOffHint: 'Press “Start” in the top right. It takes a minute or two.',
     running: 'Server running',
     starting: 'Minecraft is starting…',
+    who: 'In here now',
+    nobody: 'Nobody right now',
     players: '{{count}} / {{max}} players online',
     restart: 'Restart',
     stopMc: 'Stop Minecraft',
@@ -262,6 +275,11 @@ export default {
   },
   settings: {
     general: 'General',
+    theme: 'Appearance',
+    themes: { system: 'Match system', light: 'Light', dark: 'Dark' },
+    scale: 'Interface size',
+    scaleAuto: 'Match window size',
+    scaleHint: 'Scales the whole interface — text, spacing and icons. With “Match window size”, everything grows as you enlarge the window. Takes effect immediately.',
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:
@@ -271,6 +289,24 @@ export default {
     defaultDir: '(default: Documents\\CraftLift Backups)',
     choose: 'Choose folder',
     project: 'Current project',
+    feedback: {
+      title: 'Send feedback',
+      desc: 'Tell me about problems or ideas. What you were doing, what you expected, and what actually happened is the most useful thing you can write.',
+      open: 'Write feedback',
+      subject: 'Subject',
+      subjectPlaceholder: 'One line describing the problem',
+      name: 'Your name (optional)',
+      nameHint: 'So I know what to call you in a reply. Leave it blank if you prefer.',
+      body: 'Details',
+      bodyPlaceholder: 'What you were doing, what you expected, what actually happened',
+      privateNote:
+        'Only the developer sees this; it is not public. Your version and operating system are attached automatically. Do not include passwords or card details.',
+      sending: 'Sending',
+      sent: 'Sent — thank you',
+      failed: 'Could not send. Your network may be down, or the form may be temporarily unavailable.',
+      openInBrowser: 'Send via browser instead',
+      send: 'Send feedback'
+    },
     billing: {
       title: 'Cost and credit',
       note: 'CraftLift cannot read your remaining trial credit — Google provides no API for it. Check the real figure on the official page.',

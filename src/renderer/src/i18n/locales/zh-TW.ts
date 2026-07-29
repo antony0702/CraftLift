@@ -8,6 +8,7 @@ export default {
     error: '發生錯誤',
     retry: '重試',
     copied: '已複製',
+    copy: '複製',
     cancel: '取消',
     save: '儲存',
     saving: '儲存中…',
@@ -25,7 +26,11 @@ export default {
     UNKNOWN: '狀態不明'
   },
   setup: {
-    checking: '正在檢查環境……',
+    checking: {
+      account: '正在確認你的 Google 帳號……',
+      billing: '正在查詢你的帳單帳戶……',
+      slow: 'Google 的命令列工具啟動一次需要好幾秒，這是它的正常速度，不是當掉了。'
+    },
     gcloudMissing: {
       title: '需要先安裝 Google Cloud CLI',
       desc: 'CraftLift 透過 Google 官方的命令列工具來操作你的雲端帳號。這樣做的好處是登入時不會出現「應用程式未經驗證」的警告畫面，也沒有使用人數限制。',
@@ -65,11 +70,14 @@ export default {
     }
   },
   list: {
-    loading: '正在讀取你的伺服器……',
-    title: '我的伺服器',
+    loading: '正在讀取你的世界……',
+    title: '你的世界',
     create: '建立新伺服器',
-    empty: '還沒有任何伺服器',
-    emptyHint: '按右上角的「建立新伺服器」開始。'
+    manage: '進入管理',
+    playing: '{{count}} 人在裡面',
+    empty: '這裡還沒有伺服器。',
+    emptyHint: '建立一台，把位址給朋友，就可以一起玩了。',
+    copyAddress: '點一下複製位址'
   },
   create: {
     defaultName: '我的伺服器',
@@ -138,6 +146,9 @@ export default {
     shutdown: '關機',
     boot: '開機',
     delete: '刪除伺服器',
+    version: '版本',
+    machine: '機器',
+    zone: '機房',
     shutdownNote: '按下關機時，CraftLift 會先自動備份並把存檔帶回你的電腦，再把機器關掉。',
     needRunning: '機器目前沒有執行',
     needRunningHint: '請先按右上角的「開機」，這個分頁才能使用。',
@@ -154,6 +165,8 @@ export default {
     machineOffHint: '按右上角的「開機」啟動它，大約需要一到兩分鐘。',
     running: '伺服器執行中',
     starting: 'Minecraft 啟動中……',
+    who: '在裡面的人',
+    nobody: '目前沒有人',
     players: '線上 {{count}} / {{max}} 人',
     restart: '重新啟動',
     stopMc: '停止 Minecraft',
@@ -248,6 +261,11 @@ export default {
   },
   settings: {
     general: '一般設定',
+    theme: '介面配色',
+    themes: { system: '跟隨系統', light: '淺色', dark: '深色' },
+    scale: '介面大小',
+    scaleAuto: '跟著視窗大小',
+    scaleHint: '整體放大縮小介面，包含文字、間距與圖示。選「跟著視窗大小」時，把視窗拉大介面就等比變大。改完立即生效。',
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:
@@ -257,6 +275,24 @@ export default {
     defaultDir: '（預設：文件\\CraftLift Backups）',
     choose: '選擇資料夾',
     project: '目前使用的專案',
+    feedback: {
+      title: '意見回饋',
+      desc: '遇到問題或有建議都可以告訴我。附上你在做什麼、預期會發生什麼、實際發生了什麼，最有幫助。',
+      open: '寫一則回饋',
+      subject: '標題',
+      subjectPlaceholder: '一句話說明是什麼問題',
+      name: '你的稱呼（選填）',
+      nameHint: '留下稱呼方便回覆時稱呼你。不填也沒關係。',
+      body: '問題說明',
+      bodyPlaceholder: '你在做什麼、預期會發生什麼、實際發生了什麼',
+      privateNote:
+        '內容只有開發者看得到，不會公開。程式會自動附上版本與作業系統，省得你查。請不要填入密碼或信用卡資料。',
+      sending: '送出中',
+      sent: '已送出，謝謝',
+      failed: '送不出去。可能是網路不通，或表單暫時無法使用。',
+      openInBrowser: '改用瀏覽器送出',
+      send: '送出回饋'
+    },
     billing: {
       title: '費用與額度',
       note: 'CraftLift 無法讀取你的剩餘試用額度——Google 沒有提供這項查詢功能。請直接到官方頁面查看真實數字。',

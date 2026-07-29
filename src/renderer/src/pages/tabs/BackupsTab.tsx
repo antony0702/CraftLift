@@ -76,9 +76,9 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
         <p className="muted small">{t('backups.warningBody')}</p>
       </div>
 
-      <div className="files-bar">
+      <div className="toolbar">
         <span className="muted small">{t('backups.keepNote', { count: BACKUP_KEEP })}</span>
-        <div className="spacer" />
+        <div className="grow" />
         <button type="button" className="primary" disabled={busy} onClick={() => void createNow()}>
           {busy ? t('backups.working') : t('backups.createNow')}
         </button>
@@ -104,7 +104,7 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
       {backups.length === 0 ? (
         <p className="muted small">{t('backups.empty')}</p>
       ) : (
-        <table className="file-table">
+        <table className="table">
           <tbody>
             {backups.map((backup) => (
               <tr key={backup.path}>
@@ -112,7 +112,7 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
                 <td className="muted small nowrap">{formatSize(backup.size)}</td>
                 <td className="muted small nowrap">{formatTime(backup.modifiedAt)}</td>
                 <td className="nowrap">
-                  <button type="button" className="link" onClick={() => void download(backup)}>
+                  <button type="button" className="link-btn" onClick={() => void download(backup)}>
                     {t('backups.saveToPc')}
                   </button>
                 </td>
