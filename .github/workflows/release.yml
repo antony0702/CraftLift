@@ -59,6 +59,27 @@ jobs:
       - name: 型別檢查
         run: npm run typecheck
 
+      # electron-builder 會為每個產物開一個平行的發布器，每個都會先問
+      # 「這個 Release 存在嗎」，答案是否的話就自己建一個。第一次發某個版本時
+      # 這些發布器會在同一毫秒問到同一個答案，於是各建一個草稿，產物被拆散——
+      # 一個草稿有 exe 沒有校驗碼，另一個有校驗碼沒有 exe，兩個都不能發布。
+      # v1.0.0 第一次跑就踩到了，兩個草稿的建立時間只差三毫秒。
+      #
+      # 先把草稿建好，後面的發布器就都找得到同一個，不會再各建各的。
+      - name: 先建立草稿 Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag --json id *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "草稿 Release $tag 已經存在，沿用它"
+          } else {
+            gh release create $tag --draft --title $tag --notes "由 GitHub Actions 自動建置。確認內容後再按 Publish。"
+            Write-Host "已建立草稿 Release $tag"
+          }
+
       # --publish always：建置完成後把安裝檔、blockmap 與 latest.yml
       # 一起送上去。latest.yml 是自動更新唯一會讀的檔案，少了它，
       # 已安裝的使用者永遠看不到這一版。
