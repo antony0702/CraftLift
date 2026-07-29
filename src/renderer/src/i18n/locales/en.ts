@@ -273,6 +273,22 @@ export default {
     empty: '(no backups yet)',
     saveToPc: 'Save to PC'
   },
+  update: {
+    title: 'Software update',
+    current: 'Current version',
+    safeNote:
+      'Updating only replaces the app itself. Your settings, local backups, and the servers running in the cloud are untouched.',
+    check: 'Check for updates',
+    checking: 'Checking…',
+    latest: 'You are on the latest version.',
+    unsupported: 'Updates are not checked in development mode.',
+    available: 'Version {{version}} is available',
+    download: 'Download update',
+    downloading: 'Downloading',
+    ready: '{{version}} is downloaded — restart to apply',
+    install: 'Restart and install',
+    later: 'Later'
+  },
   settings: {
     general: 'General',
     theme: 'Appearance',

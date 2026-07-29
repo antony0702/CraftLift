@@ -319,6 +319,25 @@ export async function getPlayerLists(conn: ServerConnection): Promise<PlayerList
 }
 
 /**
+ * Minecraft 對「這個帳號不存在」的回應。
+ *
+ * 伺服器的 online-mode 預設是開的，所有名單指令都會先拿名稱去 Mojang
+ * 查真實帳號，查不到就回這句話——但**結束碼仍然是 0**。不特別認出這句，
+ * 使用者打錯一個字的下場是：輸入框清空、清單沒變、沒有任何說明。
+ *
+ * 這裡刻意只認這一句。實測其餘幾種回應都不是錯誤：
+ *   Player is already whitelisted            ← 本來就在名單上，結果正是他要的
+ *   Nothing changed. The player already is an operator
+ *   Nothing changed. The player isn't banned ← 本來就沒被封鎖
+ *   Player is not whitelisted
+ * 把這些也當錯誤丟出去，只會在使用者其實沒做錯事的時候嚇他一跳。
+ *
+ * 這是對英文原版訊息做字串比對，不夠漂亮。改成「下指令後回頭讀 JSON 檔
+ * 確認」看似穩健，實際上伺服器寫檔有延遲，會變成一個更難解的競態。
+ */
+const RCON_NO_SUCH_ACCOUNT = /That player does not exist|No player was found/i
+
+/**
  * 所有玩家名單的修改都透過 RCON 指令，而不是直接改 JSON 檔。
  * 這樣伺服器會立即生效，不用重啟；直接改檔案的話伺服器不會知道。
  */
@@ -336,5 +355,11 @@ export async function modifyPlayer(
     ban: `ban ${player}`,
     pardon: `pardon ${player}`
   }
-  return conn.rcon(commands[action])
+  const response = await conn.rcon(commands[action])
+  if (RCON_NO_SUCH_ACCOUNT.test(response)) {
+    throw new Error(
+      `Minecraft 查不到「${player}」這個帳號，請確認拼字。名稱必須和正版帳號完全一致。`
+    )
+  }
+  return response
 }

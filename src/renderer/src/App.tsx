@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { MinecraftServer } from '@shared/types'
 import { call } from './lib/api'
 import { useTheme } from './lib/theme'
+import { useUpdate } from './lib/update'
 import { Gear } from './components/Icons'
+import UpdateNotice from './components/UpdateNotice'
 import Setup from './pages/Setup'
 import ServerList from './pages/ServerList'
 import CreateServer from './pages/CreateServer'
@@ -23,6 +25,7 @@ export default function App(): React.JSX.Element {
   const [route, setRoute] = useState<Route>({ name: 'setup' })
   const [projectId, setProjectId] = useState<string | null>(null)
   const [version, setVersion] = useState('')
+  const update = useUpdate()
 
   useTheme()
 
@@ -87,6 +90,12 @@ export default function App(): React.JSX.Element {
           </button>
         )}
       </div>
+
+      <UpdateNotice
+        state={update.state}
+        onDownload={update.download}
+        onInstall={update.install}
+      />
 
       {route.name === 'setup' && (
         <Setup

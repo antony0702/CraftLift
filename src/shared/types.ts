@@ -182,6 +182,28 @@ export interface Preferences {
   lastProjectId: string | null
 }
 
+/**
+ * 自動更新的狀態。
+ *
+ * 做成一個狀態機而不是好幾個布林值，是因為「正在檢查」「有新版」「下載中」
+ * 「裝好等重開」這幾件事永遠只會成立其中一個。分開存遲早會出現
+ * 「同時在下載又同時是最新版」這種畫面。
+ */
+export type UpdateState =
+  /** 還沒查過 */
+  | { phase: 'idle' }
+  /** 開發模式或未打包，沒有更新來源可查 */
+  | { phase: 'unsupported' }
+  | { phase: 'checking' }
+  /** 已經是最新版。version 是目前跑的版本。 */
+  | { phase: 'latest'; version: string }
+  /** 有新版，等使用者決定要不要下載 */
+  | { phase: 'available'; version: string; notes: string | null; sizeBytes: number | null }
+  | { phase: 'downloading'; version: string; percent: number }
+  /** 已下載完成，等使用者決定何時重開安裝 */
+  | { phase: 'ready'; version: string }
+  | { phase: 'error'; message: string }
+
 /** 使用者填寫的意見回饋 */
 export interface FeedbackInput {
   /** 必填 */
