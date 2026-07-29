@@ -182,6 +182,16 @@ export interface Preferences {
   lastProjectId: string | null
 }
 
+/** 使用者填寫的意見回饋 */
+export interface FeedbackInput {
+  /** 必填 */
+  subject: string
+  /** 選填 */
+  name: string
+  /** 必填 */
+  body: string
+}
+
 /** 所有跨 IPC 操作的統一回傳格式。
  *  不用丟例外，因為 Error 物件在 IPC 傳遞時會掉資訊。 */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string }

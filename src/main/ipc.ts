@@ -5,6 +5,7 @@ import type {
   Backup,
   BillingAccount,
   CreateServerOptions,
+  FeedbackInput,
   MachineType,
   McVersion,
   MinecraftServer,
@@ -17,6 +18,7 @@ import type {
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
 import { applyZoom } from './zoom'
+import { feedbackFormUrl, submitFeedback } from './feedback'
 import { getGcloudStatus } from './gcloud/exec'
 import { getAuthStatus, login } from './gcloud/auth'
 import {
@@ -363,6 +365,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   /** 應用程式版本，顯示在標題列旁 */
   handle('app:version', async (): Promise<string> => app.getVersion())
+
+  // --- 意見回饋 -------------------------------------------------------------
+  handle('feedback:send', async (input: FeedbackInput): Promise<void> => submitFeedback(input))
+
+  /** 直接送出失敗時的退路：開瀏覽器，內容已預先填好 */
+  handle('feedback:openForm', async (input: FeedbackInput): Promise<void> => {
+    await shell.openExternal(feedbackFormUrl(input))
+  })
 
   handle('app:chooseDirectory', async (): Promise<string | null> => {
     const window = getWindow()

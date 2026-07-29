@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { Preferences, ThemeChoice } from '@shared/types'
 import { BILLING_CONSOLE_URL } from '@shared/constants'
 import { call, errorText } from '../lib/api'
-import { ErrorText, Field, Info, Loading, Modal } from '../components/Ui'
+import { ErrorText, Field, Info, Loading, Modal, Waiting } from '../components/Ui'
 import { Back } from '../components/Icons'
 import { supportedLanguages } from '../i18n'
 
@@ -44,31 +44,38 @@ export default function Settings({
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState({ subject: '', name: '', body: '' })
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [feedbackError, setFeedbackError] = useState('')
 
   /**
-   * 送出使用者回饋。
+   * 送出回饋。
    *
-   * 目前的做法是開啟瀏覽器、把內容預先填進一則 GitHub issue。這樣不需要
-   * 任何伺服器、不需要在開源的程式碼裡藏任何金鑰（藏了也等於公開），
-   * 回饋也直接落在會處理它的地方。
-   *
-   * 代價是回饋會公開，而且需要 GitHub 帳號。若要改成非公開的收件方式，
-   * 只需要換掉這個函式，表單本身不用動。
+   * 由主行程直接送到 Google 表單，使用者不必離開程式。若送出被拒或
+   * 網路不通，就改開瀏覽器讓他自己送——回饋送不出去卻沒人知道，
+   * 是最糟的結果，所以寧可多一道退路也不要靜靜失敗。
    */
   const sendFeedback = async (): Promise<void> => {
-    const version = await call(window.api.app.version())
-    const from = feedback.name.trim() ? `\n\n— ${feedback.name.trim()}` : ''
-    const body =
-      `${feedback.body.trim()}${from}\n\n---\nCraftLift v${version}\n` +
-      `${navigator.userAgent.includes('Windows') ? 'Windows' : navigator.platform}`
+    setSending(true)
+    setFeedbackError('')
+    try {
+      await call(window.api.app.sendFeedback(feedback))
+      setSent(true)
+      setFeedback({ subject: '', name: '', body: '' })
+      setTimeout(() => {
+        setSent(false)
+        setFeedbackOpen(false)
+      }, 1800)
+    } catch {
+      setFeedbackError(t('settings.feedback.failed'))
+    } finally {
+      setSending(false)
+    }
+  }
 
-    const url =
-      'https://github.com/antony0702/CraftLift/issues/new' +
-      `?title=${encodeURIComponent(feedback.subject.trim())}` +
-      `&body=${encodeURIComponent(body)}`
-
-    await call(window.api.app.openExternal(url))
-    setFeedback({ subject: '', name: '', body: '' })
+  /** 退路：開瀏覽器，內容已預先填好 */
+  const openFeedbackForm = async (): Promise<void> => {
+    await call(window.api.app.openFeedbackForm(feedback))
     setFeedbackOpen(false)
   }
 
@@ -240,17 +247,31 @@ export default function Settings({
             />
           </Field>
 
-          <p className="footnote">{t('settings.feedback.publicNote')}</p>
+          <p className="footnote">{t('settings.feedback.privateNote')}</p>
+
+          {feedbackError && (
+            <>
+              <ErrorText>{feedbackError}</ErrorText>
+              <button type="button" className="bare" onClick={() => void openFeedbackForm()}>
+                {t('settings.feedback.openInBrowser')}
+              </button>
+            </>
+          )}
 
           <div className="actions">
             <button
               type="button"
               className="torch"
-              disabled={!feedback.subject.trim() || !feedback.body.trim()}
+              disabled={sending || sent || !feedback.subject.trim() || !feedback.body.trim()}
               onClick={() => void sendFeedback()}
             >
-              {t('settings.feedback.send')}
+              {sent
+                ? t('settings.feedback.sent')
+                : sending
+                  ? t('settings.feedback.sending')
+                  : t('settings.feedback.send')}
             </button>
+            {sending && <Waiting />}
             <button type="button" className="bare" onClick={() => setFeedbackOpen(false)}>
               {t('common.cancel')}
             </button>

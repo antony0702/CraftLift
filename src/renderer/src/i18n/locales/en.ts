@@ -299,8 +299,12 @@ export default {
       nameHint: 'So I know what to call you in a reply. Leave it blank if you prefer.',
       body: 'Details',
       bodyPlaceholder: 'What you were doing, what you expected, what actually happened',
-      publicNote:
-        'Sending opens your browser with a GitHub issue pre-filled; you confirm before it posts. The content becomes public — do not include passwords or personal data.',
+      privateNote:
+        'Only the developer sees this; it is not public. Your version and operating system are attached automatically. Do not include passwords or card details.',
+      sending: 'Sending',
+      sent: 'Sent — thank you',
+      failed: 'Could not send. Your network may be down, or the form may be temporarily unavailable.',
+      openInBrowser: 'Send via browser instead',
       send: 'Send feedback'
     },
     billing: {
