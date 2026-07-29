@@ -70,7 +70,9 @@ export function Modal({
     <div className="backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="path">{title}</span>
+          {/* 標題原樣輸出：檔案編輯器要的是等寬的路徑，對話框要的是一般標題，
+              樣式交給呼叫端決定 */}
+          {title}
           <button type="button" className="icon-btn" onClick={onClose} aria-label="close">
             ✕
           </button>

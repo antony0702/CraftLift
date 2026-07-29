@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { Preferences, ThemeChoice } from '@shared/types'
 import { BILLING_CONSOLE_URL } from '@shared/constants'
 import { call, errorText } from '../lib/api'
-import { ErrorText, Field, Info, Loading } from '../components/Ui'
+import { ErrorText, Field, Info, Loading, Modal } from '../components/Ui'
 import { Back } from '../components/Icons'
 import { supportedLanguages } from '../i18n'
 
@@ -43,6 +43,7 @@ export default function Settings({
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState({ subject: '', name: '', body: '' })
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   /**
    * 送出使用者回饋。
@@ -68,6 +69,7 @@ export default function Settings({
 
     await call(window.api.app.openExternal(url))
     setFeedback({ subject: '', name: '', body: '' })
+    setFeedbackOpen(false)
   }
 
   useEffect(() => {
@@ -202,45 +204,59 @@ export default function Settings({
         {t('settings.feedback.title')}
       </div>
       <p className="muted">{t('settings.feedback.desc')}</p>
-
-      <Field label={t('settings.feedback.subject')}>
-        <input
-          type="text"
-          value={feedback.subject}
-          maxLength={80}
-          placeholder={t('settings.feedback.subjectPlaceholder')}
-          onChange={(e) => setFeedback({ ...feedback, subject: e.target.value })}
-        />
-      </Field>
-
-      <Field label={t('settings.feedback.name')} hint={t('settings.feedback.nameHint')}>
-        <input
-          type="text"
-          value={feedback.name}
-          maxLength={40}
-          onChange={(e) => setFeedback({ ...feedback, name: e.target.value })}
-        />
-      </Field>
-
-      <Field label={t('settings.feedback.body')}>
-        <textarea
-          rows={6}
-          value={feedback.body}
-          placeholder={t('settings.feedback.bodyPlaceholder')}
-          onChange={(e) => setFeedback({ ...feedback, body: e.target.value })}
-        />
-      </Field>
-
-      <p className="footnote">{t('settings.feedback.publicNote')}</p>
       <div className="actions">
-        <button
-          type="button"
-          disabled={!feedback.subject.trim() || !feedback.body.trim()}
-          onClick={() => void sendFeedback()}
-        >
-          {t('settings.feedback.send')}
+        <button type="button" onClick={() => setFeedbackOpen(true)}>
+          {t('settings.feedback.open')}
         </button>
       </div>
+
+      {feedbackOpen && (
+        <Modal title={<h3>{t('settings.feedback.title')}</h3>} onClose={() => setFeedbackOpen(false)}>
+          <Field label={t('settings.feedback.subject')}>
+            <input
+              type="text"
+              value={feedback.subject}
+              maxLength={80}
+              placeholder={t('settings.feedback.subjectPlaceholder')}
+              onChange={(e) => setFeedback({ ...feedback, subject: e.target.value })}
+            />
+          </Field>
+
+          <Field label={t('settings.feedback.name')} hint={t('settings.feedback.nameHint')}>
+            <input
+              type="text"
+              value={feedback.name}
+              maxLength={40}
+              onChange={(e) => setFeedback({ ...feedback, name: e.target.value })}
+            />
+          </Field>
+
+          <Field label={t('settings.feedback.body')}>
+            <textarea
+              rows={7}
+              value={feedback.body}
+              placeholder={t('settings.feedback.bodyPlaceholder')}
+              onChange={(e) => setFeedback({ ...feedback, body: e.target.value })}
+            />
+          </Field>
+
+          <p className="footnote">{t('settings.feedback.publicNote')}</p>
+
+          <div className="actions">
+            <button
+              type="button"
+              className="torch"
+              disabled={!feedback.subject.trim() || !feedback.body.trim()}
+              onClick={() => void sendFeedback()}
+            >
+              {t('settings.feedback.send')}
+            </button>
+            <button type="button" className="bare" onClick={() => setFeedbackOpen(false)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       <div className="eyebrow" style={{ marginTop: 44 }}>
         {t('settings.billing.title')}

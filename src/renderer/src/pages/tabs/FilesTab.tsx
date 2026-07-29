@@ -154,7 +154,7 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
       )}
 
       {editing && (
-        <Modal title={editing.path} onClose={() => setEditing(null)}>
+        <Modal title={<span className="path">{editing.path}</span>} onClose={() => setEditing(null)}>
           <textarea
             className="editor"
             value={editing.content}

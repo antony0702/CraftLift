@@ -278,6 +278,7 @@ export default {
     feedback: {
       title: '意見回饋',
       desc: '遇到問題或有建議都可以告訴我。附上你在做什麼、預期會發生什麼、實際發生了什麼，最有幫助。',
+      open: '寫一則回饋',
       subject: '標題',
       subjectPlaceholder: '一句話說明是什麼問題',
       name: '你的稱呼（選填）',

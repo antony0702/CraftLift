@@ -292,6 +292,7 @@ export default {
     feedback: {
       title: 'Send feedback',
       desc: 'Tell me about problems or ideas. What you were doing, what you expected, and what actually happened is the most useful thing you can write.',
+      open: 'Write feedback',
       subject: 'Subject',
       subjectPlaceholder: 'One line describing the problem',
       name: 'Your name (optional)',
