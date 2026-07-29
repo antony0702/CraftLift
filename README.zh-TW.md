@@ -67,6 +67,37 @@ SHA512 校驗，對不上就中止。
 | 本機備份 | `文件\CraftLift Backups`（可在設定裡改） |
 | 伺服器、世界存檔 | 在你的 Google Cloud 上 |
 
+## 驗證你下載到的安裝檔
+
+安裝檔不是在任何人的電腦上編出來的，而是由 GitHub Actions 從這個 repo 的原始碼建置，
+流程寫在 [`.github/workflows/release.yml`](.github/workflows/release.yml)，公開可看。
+
+建置完成時，GitHub 會簽發一張**建置來源證明**，把安裝檔的雜湊值綁定到 repo、
+commit、workflow 與那一次 run，並登記進公開的透明性日誌。簽章金鑰由 GitHub 當場產生、
+用完即棄，**沒有任何人拿得到它**——包括這個專案的作者。
+
+安裝之前，先用 [GitHub CLI](https://cli.github.com) 驗一下：
+
+```bash
+gh attestation verify CraftLift-Setup-1.0.0.exe --repo antony0702/CraftLift
+```
+
+通過的話，你就知道手上這個檔案確實是從這裡的原始碼編出來的，而且看得到是哪一個 commit。
+接著你可以去讀那份程式碼——**這才是「開源」對使用者真正的意義**。
+
+你也可以核對 Release 頁面上 `SHA256SUMS.txt` 裡的校驗碼：
+
+```powershell
+Get-FileHash CraftLift-Setup-1.0.0.exe -Algorithm SHA256
+```
+
+不過要知道校驗碼的天花板：它是我們自己算、自己貼上去的，只擋得住「檔案在傳輸途中被改」，
+擋不住「發布者本人心懷不軌」。上面那張來源證明才擋得住後者。
+
+> **關於 Windows 的警告畫面。** 目前的安裝檔沒有購買程式碼簽章憑證，所以 Windows
+> SmartScreen 會跳出「不明的發行者」。那個警告反映的是「沒有付費憑證」，不是
+> 「這個檔案有問題」。要不要信任，請用上面那道驗證來判斷。
+
 ## 開發狀態
 
 早期開發中，尚無法使用。

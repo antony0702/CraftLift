@@ -8,9 +8,14 @@ on:
     tags:
       - 'v*'
 
-# electron-builder 要把檔案傳到 Releases，需要寫入權限。
 permissions:
+  # electron-builder 要把檔案傳到 Releases
   contents: write
+  # 以下兩項是簽發建置來源證明用的。id-token 讓這次 run 能跟 Sigstore
+  # 換一把當場產生、用完即棄的簽章金鑰——沒有任何人（包括 repo 擁有者）
+  # 拿得到它，這正是那張證明有意義的原因。
+  id-token: write
+  attestations: write
 
 jobs:
   release-windows:
@@ -63,6 +68,29 @@ jobs:
         run: |
           npm run build
           npx electron-builder --win --publish always
+
+      # --- 建置來源證明 ---
+      #
+      # 校驗碼有個天花板：它是我們自己算、自己貼上去的。使用者拿它比對
+      # 只能確認「檔案在傳輸途中沒被改」，沒辦法確認「這個 exe 真的是從
+      # 公開的那份原始碼編出來的」——因為如果安裝檔一開始就被動過手腳，
+      # 那份校驗碼也會是動過手腳之後的值。
+      #
+      # 這一步讓 GitHub（不是我們）簽發一張證明，把 exe 的雜湊值綁定到
+      # repo、commit SHA、workflow 檔案與這一次 run，並寫進 Sigstore 的
+      # 公開透明性日誌。使用者跑：
+      #
+      #   gh attestation verify CraftLift-Setup-<版本>.exe --repo antony0702/CraftLift
+      #
+      # 就能確認手上的檔案來自哪一個 commit，再自己去讀那份原始碼。
+      # 對一個開源專案來說這是必要的一環——程式碼公開卻沒人能確認 exe
+      # 跟它對得上的話，公開就只是好看而已。
+      #
+      # 放在建置之後：要簽的必須是真正上傳出去的那幾個檔案。
+      - name: 簽發建置來源證明
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: 'release/*.exe'
 
       # 校驗碼給「自己去下載安裝檔」的人用。自動更新走的是 latest.yml
       # 裡的 SHA512，那條路已經有把關，這份是給人手動核對的。

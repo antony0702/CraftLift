@@ -74,6 +74,41 @@ none of them are touched:
 | Local backups | `Documents\CraftLift Backups` (configurable) |
 | Servers and world saves | On your Google Cloud account |
 
+## Verifying your download
+
+The installer is not built on anyone's laptop. It is built by GitHub Actions from the source in
+this repository, using a workflow you can read:
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+When the build finishes, GitHub issues a **build provenance attestation** binding the installer's
+digest to the repository, the commit, the workflow and that specific run, and records it in a
+public transparency log. The signing key is minted for that run and thrown away — **nobody can
+obtain it**, including this project's author.
+
+Before installing, verify it with the [GitHub CLI](https://cli.github.com):
+
+```bash
+gh attestation verify CraftLift-Setup-1.0.0.exe --repo antony0702/CraftLift
+```
+
+If it passes, the file you hold really was built from the source here, and you can see exactly
+which commit it came from. You can then go read that code — **which is what "open source" is
+supposed to be worth to a user.**
+
+You can also check the digest against `SHA256SUMS.txt` on the release page:
+
+```powershell
+Get-FileHash CraftLift-Setup-1.0.0.exe -Algorithm SHA256
+```
+
+Be aware of what a checksum can and cannot do: we compute and publish it ourselves, so it only
+proves the file was not altered in transit — not that the publisher was honest. The attestation
+above is what covers the second case.
+
+> **About the Windows warning.** The installer is not code-signed, so Windows SmartScreen will
+> report an unknown publisher. That warning reflects the absence of a paid certificate, not a
+> problem with the file. Use the verification above to decide whether to trust it.
+
 ## Status
 
 Early development. Not yet usable.
