@@ -42,3 +42,22 @@ export async function login(): Promise<AuthStatus> {
   invalidateAuthCache()
   return getAuthStatus(true)
 }
+
+/**
+ * 登出目前的 Google 帳號。
+ *
+ * CraftLift 自己不保管任何憑證——登入狀態完全由 gcloud 管理，所以登出
+ * 就是請 gcloud 把這個帳號的憑證撤銷掉。
+ *
+ * 只撤銷「使用中」的那一個，刻意不用 `--all`：使用者的 gcloud 可能還登著
+ * 別的帳號在做跟 CraftLift 無關的事，一併清掉是越權。
+ *
+ * 本來就沒有登入時直接結束，不視為錯誤——使用者要的結果已經成立了。
+ */
+export async function logout(): Promise<void> {
+  const status = await getAuthStatus(true)
+  if (status.account) {
+    await runGcloud(['auth', 'revoke', status.account, '--quiet'])
+  }
+  invalidateAuthCache()
+}

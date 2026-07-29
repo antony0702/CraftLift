@@ -26,6 +26,12 @@ export default {
     UNKNOWN: '狀態不明'
   },
   setup: {
+    /* 首次設定每一頁上方的小標，讓使用者知道自己走到哪一步了 */
+    steps: {
+      environment: '第一步 · 準備環境',
+      account: '第二步 · Google 帳號',
+      server: '第三步 · 建立專案'
+    },
     checking: {
       account: '正在確認你的 Google 帳號……',
       billing: '正在查詢你的帳單帳戶……',
@@ -335,7 +341,7 @@ export default {
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:
-      '建議保持開啟。「試用到期前自動把存檔備份到電腦」這個保護只有在 CraftLift 有在執行時才會生效；關掉的話，你的世界可能會在 90 天到期時真的消失。',
+      '開機時自動在背景啟動，縮在系統匣裡，需要時點一下就能管理伺服器。這不影響雲端上的伺服器——它會一直執行，跟這台電腦有沒有開機無關。',
     backupOnShutdown: '關機前自動把存檔備份到電腦',
     backupDir: '本機備份存放位置',
     defaultDir: '（預設：文件\\CraftLift Backups）',
@@ -363,6 +369,16 @@ export default {
       title: '費用與額度',
       note: 'CraftLift 無法讀取你的剩餘試用額度——Google 沒有提供這項查詢功能。請直接到官方頁面查看真實數字。',
       open: '查看我的剩餘額度'
+    },
+    account: {
+      title: 'Google 帳號',
+      current: '目前登入',
+      none: '（未登入）',
+      signOut: '登出帳號',
+      working: '登出中…',
+      note: '登出只會撤銷這台電腦上的登入憑證。你的伺服器、世界存檔與備份都留在 Google Cloud 上，重新登入同一個帳號就會全部回來。',
+      confirm:
+        '確定要登出嗎？畫面會回到一開始的設定步驟，要重新登入才能繼續管理伺服器。雲端上的東西不會被刪除。'
     },
     danger: {
       title: '徹底清除',

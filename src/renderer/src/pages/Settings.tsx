@@ -33,16 +33,19 @@ const SCALES: Array<number | 'auto'> = [
 export default function Settings({
   projectId,
   onBack,
-  onProjectDeleted
+  onReturnToSetup
 }: {
   projectId: string | null
   onBack: () => void
-  onProjectDeleted: () => void
+  /** 登出或徹底清除之後都要回到首次設定畫面，兩者走同一條路 */
+  onReturnToSetup: () => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [prefs, setPrefs] = useState<Preferences | null>(null)
+  const [account, setAccount] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [feedback, setFeedback] = useState({ subject: '', name: '', body: '' })
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [sending, setSending] = useState(false)
@@ -93,6 +96,10 @@ export default function Settings({
     void window.api.app.version().then((r) => {
       if (r.ok) setVersion(r.data)
     })
+    // 這是快取過的，不會再花一次 gcloud 的三秒
+    void window.api.gcloud.authStatus().then((r) => {
+      if (r.ok) setAccount(r.data.account)
+    })
   }, [])
 
   const update = async (patch: Partial<Preferences>): Promise<void> => {
@@ -123,11 +130,32 @@ export default function Settings({
     setMessage('')
     try {
       await call(window.api.project.delete())
-      onProjectDeleted()
+      onReturnToSetup()
     } catch (err) {
       setMessage(errorText(err))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * 登出 Google 帳號。
+   *
+   * 這不會動到雲端上的任何東西——伺服器、世界存檔、備份都留在 Google Cloud
+   * 上，重新登入同一個帳號就全部回來。先問一次是因為要復原得再跑一趟瀏覽器
+   * 授權，不是點錯就能馬上退回來的那種操作。
+   */
+  const signOut = async (): Promise<void> => {
+    if (!window.confirm(t('settings.account.confirm'))) return
+    setSigningOut(true)
+    setMessage('')
+    try {
+      await call(window.api.gcloud.logout())
+      // 成功就直接跳回首次設定畫面，這個元件會被卸載，不用收尾
+      onReturnToSetup()
+    } catch (err) {
+      setMessage(errorText(err))
+      setSigningOut(false)
     }
   }
 
@@ -359,6 +387,21 @@ export default function Settings({
           {t('settings.project')}: <span className="fact">{projectId}</span>
         </p>
       )}
+
+      <div className="eyebrow" style={{ marginTop: 44 }}>
+        {t('settings.account.title')}
+      </div>
+      <p className="muted small">
+        {t('settings.account.current')}:{' '}
+        <span className="fact">{account ?? t('settings.account.none')}</span>
+      </p>
+      <p className="muted small">{t('settings.account.note')}</p>
+      <div className="actions">
+        <button type="button" disabled={signingOut} onClick={() => void signOut()}>
+          {signingOut ? t('settings.account.working') : t('settings.account.signOut')}
+        </button>
+        {signingOut && <Waiting />}
+      </div>
 
       <div className="eyebrow" style={{ marginTop: 44 }}>
         {t('settings.danger.title')}

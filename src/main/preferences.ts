@@ -7,8 +7,8 @@ const DEFAULTS: Preferences = {
   language: 'zh-TW',
   theme: 'system',
   uiScale: 'auto',
-  // 預設開啟。「試用到期前 7 天自動備份到本機」只有在 CraftLift 有在執行時
-  // 才可能發生，關掉這個選項等於讓那道保護失效。
+  // 預設開啟，讓使用者開機後就能一點叫出來看伺服器狀態。
+  // 這只影響 CraftLift 自己，跟雲端伺服器是否執行完全無關。
   launchAtLogin: true,
   backupIntervalHours: 6,
   backupToLocalOnShutdown: true,
