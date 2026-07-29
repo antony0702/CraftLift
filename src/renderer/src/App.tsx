@@ -132,7 +132,9 @@ export default function App(): React.JSX.Element {
         <Settings
           projectId={projectId}
           onBack={() => setRoute({ name: 'list' })}
-          onProjectDeleted={() => {
+          /* 登出與徹底清除都回到這裡。Setup 一掛載就會重新檢查登入狀態與
+             專案，所以使用者看到的就是剛裝好第一次打開的那個畫面。 */
+          onReturnToSetup={() => {
             setProjectId(null)
             setRoute({ name: 'setup' })
           }}

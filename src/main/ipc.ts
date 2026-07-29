@@ -23,7 +23,7 @@ import { jvmHeapFor, REMOTE } from '@shared/constants'
 import { applyZoom } from './zoom'
 import { feedbackFormUrl, submitFeedback } from './feedback'
 import { getGcloudStatus } from './gcloud/exec'
-import { getAuthStatus, login } from './gcloud/auth'
+import { getAuthStatus, login, logout } from './gcloud/auth'
 import {
   deleteProject,
   ensureProject,
@@ -128,6 +128,20 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('gcloud:status', getGcloudStatus)
   handle('gcloud:authStatus', getAuthStatus)
   handle('gcloud:login', login)
+
+  /**
+   * 登出。
+   *
+   * 除了撤銷憑證，記住的專案編號也要一起清掉——不清的話，換一個 Google
+   * 帳號登入時會看到上一個帳號的專案，而那個專案在新帳號底下根本不存在。
+   * SSH 連線同樣要收掉，它是用舊帳號的身分建立的。
+   */
+  handle('gcloud:logout', async (): Promise<void> => {
+    closeAllConnections()
+    await logout()
+    currentProjectId = null
+    await setPreferences({ lastProjectId: null })
+  })
 
   // --- 專案 -----------------------------------------------------------------
   handle('project:billingAccounts', async (): Promise<BillingAccount[]> => listBillingAccounts())

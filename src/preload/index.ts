@@ -39,7 +39,9 @@ const api = {
   gcloud: {
     status: (): Promise<Result<GcloudStatus>> => invoke('gcloud:status'),
     authStatus: (): Promise<Result<AuthStatus>> => invoke('gcloud:authStatus'),
-    login: (): Promise<Result<AuthStatus>> => invoke('gcloud:login')
+    login: (): Promise<Result<AuthStatus>> => invoke('gcloud:login'),
+    /** 登出：撤銷這台電腦上的憑證，並清掉記住的專案 */
+    logout: (): Promise<Result<void>> => invoke('gcloud:logout')
   },
 
   /** GCP 專案與帳單 */

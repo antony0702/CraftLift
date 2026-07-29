@@ -26,6 +26,12 @@ export default {
     UNKNOWN: 'Unknown'
   },
   setup: {
+    /* Small headings above each first-run page, so people know where they are */
+    steps: {
+      environment: 'Step 1 · Prerequisites',
+      account: 'Step 2 · Google account',
+      server: 'Step 3 · Create the project'
+    },
     checking: {
       account: 'Checking your Google account…',
       billing: 'Looking up your billing accounts…',
@@ -355,7 +361,7 @@ export default {
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:
-      'Best left on. The “back up before the trial expires” protection only works while CraftLift is running — with this off, your world may genuinely be lost when the 90 days are up.',
+      'Starts CraftLift in the background at login, minimised to the tray, so managing your server is one click away. It has no effect on the cloud server — that keeps running whether or not this PC is on.',
     backupOnShutdown: 'Copy the world to my PC before shutting down',
     backupDir: 'Local backup folder',
     defaultDir: '(default: Documents\\CraftLift Backups)',
@@ -383,6 +389,16 @@ export default {
       title: 'Cost and credit',
       note: 'CraftLift cannot read your remaining trial credit — Google provides no API for it. Check the real figure on the official page.',
       open: 'View my remaining credit'
+    },
+    account: {
+      title: 'Google account',
+      current: 'Signed in as',
+      none: '(not signed in)',
+      signOut: 'Sign out',
+      working: 'Signing out…',
+      note: 'Signing out only revokes the credentials on this PC. Your servers, worlds and backups stay on Google Cloud, and signing back in with the same account brings all of it back.',
+      confirm:
+        'Sign out? You will be taken back to the initial setup steps and will need to sign in again to manage your servers. Nothing in the cloud is deleted.'
     },
     danger: {
       title: 'Delete everything',

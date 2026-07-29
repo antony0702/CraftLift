@@ -48,10 +48,10 @@ usage and charges.** See the [licence](LICENSE) for the full disclaimer.
 - Provisions a VM sized by how many people will play, not by machine model numbers
 - Installs a Vanilla Minecraft server managed by `systemd`, so it restarts on boot and after crashes
 - Live console and log view, driven over RCON
-- File manager with a built-in text editor, so you can edit `server.properties`, drop in datapacks,
-  or swap the server jar yourself
-- Automatic rotating backups on the VM, plus pull-to-local backups before shutdown and before the
-  trial expires
+- A file manager that works like Windows Explorer — multi-select, right-click menus, drag and drop,
+  rename, cut/copy/paste — plus a built-in text editor for `server.properties`, so you can drop in
+  datapacks or swap the server jar yourself
+- Automatic rotating backups on the VM, and the world is pulled back to your PC before shutdown
 - Graphical `server.properties` editor and player (whitelist / op / ban) management
 - An SSH terminal for when you want to get your hands dirty
 
@@ -111,7 +111,11 @@ above is what covers the second case.
 
 ## Status
 
-Early development. Not yet usable.
+1.0.0 is the first public release. The whole flow — set up, create a server, run it, back it up,
+shut it down, delete it — has been tested against real Google Cloud accounts.
+
+Expect rough edges. Bug reports and suggestions are welcome, either through **Settings → Feedback**
+in the app or as an issue here.
 
 ## Requirements
 
