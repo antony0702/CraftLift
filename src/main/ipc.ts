@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { mkdir } from 'node:fs/promises'
+import { access, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   Backup,
@@ -15,7 +15,9 @@ import type {
   RemoteFile,
   Result,
   ServerProperties,
-  UpdateState
+  TransferItem,
+  UpdateState,
+  UploadItem
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
 import { applyZoom } from './zoom'
@@ -77,6 +79,28 @@ async function withConnection<T>(
   const projectId = await requireProject()
   const conn = await getConnection(projectId, name, zone)
   return fn(conn)
+}
+
+/**
+ * 在本機挑一個還沒被佔用的檔名。
+ *
+ * 一次下載多個檔案時不逐一問「要不要覆蓋」，而是像瀏覽器那樣自動加編號。
+ * 默默蓋掉使用者電腦上既有的檔案是不能接受的。
+ */
+async function freeLocalPath(dir: string, fileName: string): Promise<string> {
+  const dot = fileName.lastIndexOf('.')
+  const stem = dot > 0 ? fileName.slice(0, dot) : fileName
+  const ext = dot > 0 ? fileName.slice(dot) : ''
+
+  for (let n = 1; n < 1000; n++) {
+    const candidate = join(dir, n === 1 ? fileName : `${stem} (${n})${ext}`)
+    try {
+      await access(candidate)
+    } catch {
+      return candidate
+    }
+  }
+  return join(dir, `${stem}-${Date.now()}${ext}`)
 }
 
 /**
@@ -209,7 +233,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
         if (backups[0]) {
           const dir = prefs.localBackupDir ?? defaultLocalBackupDir()
           await mkdir(dir, { recursive: true })
-          await ops.downloadFile(conn, backups[0].path, join(dir, backups[0].fileName))
+          await ops.downloadPath(conn, backups[0].path, join(dir, backups[0].fileName))
         }
       } catch {
         // 忽略：備份失敗不應該讓使用者關不了機
@@ -274,42 +298,113 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     async (name: string, zone: string, path: string, content: string): Promise<void> =>
       withConnection(name, zone, (conn) => ops.writeTextFile(conn, path, content))
   )
-  handle('files:delete', async (name: string, zone: string, path: string): Promise<void> =>
-    withConnection(name, zone, (conn) => ops.deleteRemoteFile(conn, path))
+  handle('files:names', async (name: string, zone: string, dir: string): Promise<string[]> =>
+    withConnection(name, zone, (conn) => ops.listNames(conn, dir))
   )
+  handle('files:delete', async (name: string, zone: string, paths: string[]): Promise<void> =>
+    withConnection(name, zone, (conn) => ops.deleteRemoteFiles(conn, paths))
+  )
+  handle('files:mkdir', async (name: string, zone: string, path: string): Promise<void> =>
+    withConnection(name, zone, (conn) => ops.makeDirectory(conn, path))
+  )
+  handle(
+    'files:rename',
+    async (name: string, zone: string, path: string, newName: string): Promise<string> =>
+      withConnection(name, zone, (conn) => ops.renameRemote(conn, path, newName))
+  )
+  handle(
+    'files:copy',
+    async (name: string, zone: string, items: TransferItem[]): Promise<void> =>
+      withConnection(name, zone, (conn) => ops.copyRemote(conn, items))
+  )
+  handle(
+    'files:move',
+    async (name: string, zone: string, items: TransferItem[]): Promise<void> =>
+      withConnection(name, zone, (conn) => ops.moveRemote(conn, items))
+  )
+
+  /**
+   * 只開檔案選擇視窗，不上傳。
+   *
+   * 選檔跟上傳分開，畫面才能夾在中間問「已經有同名檔案，要取代嗎」——
+   * 這是檔案總管的行為。合成一個 IPC 就沒有插話的餘地了。
+   */
+  handle('files:pick', async (): Promise<string[]> => {
+    const window = getWindow()
+    if (!window) return []
+    const picked = await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'multiSelections']
+    })
+    return picked.canceled ? [] : picked.filePaths
+  })
+
+  /** 選資料夾上傳。資料夾整棵會被帶上去。 */
+  handle('files:pickDirectory', async (): Promise<string[]> => {
+    const window = getWindow()
+    if (!window) return []
+    const picked = await dialog.showOpenDialog(window, {
+      properties: ['openDirectory', 'multiSelections']
+    })
+    return picked.canceled ? [] : picked.filePaths
+  })
 
   handle(
     'files:upload',
-    async (name: string, zone: string, remoteDir: string): Promise<string | null> => {
-      const window = getWindow()
-      if (!window) return null
-      const picked = await dialog.showOpenDialog(window, { properties: ['openFile'] })
-      if (picked.canceled || !picked.filePaths[0]) return null
-
-      const localPath = picked.filePaths[0]
-      const fileName = localPath.split(/[\\/]/).pop() as string
-      await withConnection(name, zone, (conn) =>
-        ops.uploadFile(conn, localPath, `${remoteDir.replace(/\/$/, '')}/${fileName}`)
-      )
-      return fileName
+    async (name: string, zone: string, items: UploadItem[]): Promise<void> => {
+      await withConnection(name, zone, async (conn) => {
+        for (const item of items) {
+          await ops.uploadPath(conn, item.localPath, item.remotePath, item.replace)
+        }
+      })
     }
   )
 
+  /**
+   * 下載。單一檔案走「另存新檔」，其餘（多選或資料夾）走「選一個資料夾」，
+   * 跟瀏覽器與檔案總管的習慣一致。回傳存到哪裡，畫面用它提供「開啟位置」。
+   */
   handle(
     'files:download',
-    async (name: string, zone: string, remotePath: string): Promise<string | null> => {
+    async (name: string, zone: string, remotePaths: string[]): Promise<string | null> => {
       const window = getWindow()
-      if (!window) return null
-      const fileName = remotePath.split('/').pop() as string
-      const picked = await dialog.showSaveDialog(window, { defaultPath: fileName })
-      if (picked.canceled || !picked.filePath) return null
+      if (!window || remotePaths.length === 0) return null
 
-      await withConnection(name, zone, (conn) =>
-        ops.downloadFile(conn, remotePath, picked.filePath as string)
-      )
-      return picked.filePath
+      const single = remotePaths.length === 1 ? remotePaths[0] : null
+      if (single) {
+        const isDir = await withConnection(name, zone, (conn) =>
+          ops.isRemoteDirectory(conn, single)
+        )
+        if (!isDir) {
+          const picked = await dialog.showSaveDialog(window, {
+            defaultPath: single.split('/').pop()
+          })
+          if (picked.canceled || !picked.filePath) return null
+          const target = picked.filePath
+          await withConnection(name, zone, (conn) => ops.downloadPath(conn, single, target))
+          return target
+        }
+      }
+
+      const picked = await dialog.showOpenDialog(window, {
+        properties: ['openDirectory', 'createDirectory']
+      })
+      if (picked.canceled || !picked.filePaths[0]) return null
+      const dir = picked.filePaths[0]
+
+      await withConnection(name, zone, async (conn) => {
+        for (const remotePath of remotePaths) {
+          const target = await freeLocalPath(dir, remotePath.split('/').pop() as string)
+          await ops.downloadPath(conn, remotePath, target)
+        }
+      })
+      return dir
     }
   )
+
+  /** 在檔案總管裡把剛下載的東西指出來 */
+  handle('files:reveal', async (localPath: string): Promise<void> => {
+    shell.showItemInFolder(localPath)
+  })
 
   // --- 備份 -----------------------------------------------------------------
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>

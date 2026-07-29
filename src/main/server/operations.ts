@@ -1,8 +1,17 @@
 import { createReadStream, createWriteStream } from 'node:fs'
+import { mkdir, readdir, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { pipeline } from 'node:stream/promises'
 import { REMOTE } from '@shared/constants'
-import type { Backup, PlayerLists, RemoteFile, ServerProperties } from '@shared/types'
+import type { FileEntry, SFTPWrapper } from 'ssh2'
+import type {
+  Backup,
+  PlayerLists,
+  RemoteFile,
+  ServerProperties,
+  TransferItem
+} from '@shared/types'
 import type { ServerConnection } from './ssh'
 
 /**
@@ -24,6 +33,22 @@ function assertInServerDir(path: string): void {
   if (!normalized.startsWith(REMOTE.serverDir) || normalized.includes('..')) {
     throw new Error(`路徑不在允許的範圍內：${path}`)
   }
+}
+
+/** 遠端路徑的最後一段 */
+function baseName(path: string): string {
+  return path.replace(/\/+$/, '').split('/').pop() ?? path
+}
+
+/**
+ * /tmp 底下的暫存路徑。
+ *
+ * SFTP 是用登入使用者的身分連線的，寫不進 /opt/minecraft（那是 minecraft
+ * 使用者的目錄）。所以所有進出的檔案都先落在這裡，再用 sudo 帶著正確的
+ * 擁有者搬過去——整棵資料夾樹也只花這一次 sudo。
+ */
+function stagingPath(): string {
+  return `/tmp/craftlift-${randomBytes(6).toString('hex')}`
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +154,20 @@ export async function listFiles(conn: ServerConnection, path: string): Promise<R
     })
 }
 
+/**
+ * 只取某個資料夾裡的名稱。
+ *
+ * 貼上、上傳、重新命名之前都要先知道會不會撞名。撈完整的 listFiles
+ * 也做得到，但那要多帶大小與時間，而撞名判斷只需要名字。
+ */
+export async function listNames(conn: ServerConnection, dir: string): Promise<string[]> {
+  assertInServerDir(dir)
+  const result = await conn.exec(
+    `sudo find ${sq(dir)} -maxdepth 1 -mindepth 1 -printf '%f\\0' 2>/dev/null || true`
+  )
+  return result.stdout.split('\0').filter(Boolean)
+}
+
 export async function readTextFile(conn: ServerConnection, path: string): Promise<string> {
   assertInServerDir(path)
   const result = await conn.exec(`sudo cat ${sq(path)}`)
@@ -139,9 +178,8 @@ export async function readTextFile(conn: ServerConnection, path: string): Promis
 /**
  * 寫入檔案。
  *
- * SFTP 是用登入使用者的身分連線的，沒有權限直接寫 /opt/minecraft
- * （那是 minecraft 使用者的目錄）。所以先傳到 /tmp，再用 sudo 搬進去
- * 並設定正確的擁有者。
+ * 先傳到 /tmp，再用 sudo 搬進去並設定正確的擁有者，
+ * 原因見 stagingPath 的說明。
  */
 export async function writeTextFile(
   conn: ServerConnection,
@@ -149,66 +187,245 @@ export async function writeTextFile(
   content: string
 ): Promise<void> {
   assertInServerDir(path)
-  const staging = `/tmp/craftlift-${randomBytes(6).toString('hex')}`
+  const staging = stagingPath()
 
-  const sftp = await conn.sftp()
-  await new Promise<void>((resolve, reject) => {
-    const stream = sftp.createWriteStream(staging)
-    stream.on('close', resolve).on('error', reject)
-    stream.end(Buffer.from(content, 'utf8'))
-  })
+  try {
+    await conn.withSftp(
+      (sftp) =>
+        new Promise<void>((resolve, reject) => {
+          const stream = sftp.createWriteStream(staging)
+          stream.on('close', resolve).on('error', reject)
+          stream.end(Buffer.from(content, 'utf8'))
+        })
+    )
 
-  const result = await conn.exec(
-    `sudo install -o minecraft -g minecraft -m 644 ${sq(staging)} ${sq(path)} && rm -f ${sq(staging)}`
-  )
-  if (result.code !== 0) throw new Error(result.stderr.trim() || '寫入檔案失敗')
+    const result = await conn.exec(
+      `sudo install -o minecraft -g minecraft -m 644 ${sq(staging)} ${sq(path)}`
+    )
+    if (result.code !== 0) throw new Error(result.stderr.trim() || '寫入檔案失敗')
+  } finally {
+    // 半路失敗也要把暫存清掉，不然 /tmp 會慢慢被沒人認領的檔案塞滿
+    await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
+  }
 }
 
-export async function deleteRemoteFile(conn: ServerConnection, path: string): Promise<void> {
+/** 遠端這個路徑是不是資料夾 */
+export async function isRemoteDirectory(conn: ServerConnection, path: string): Promise<boolean> {
+  assertInServerDir(path)
+  const result = await conn.exec(`sudo test -d ${sq(path)} && echo YES || true`)
+  return result.stdout.includes('YES')
+}
+
+/** 建立資料夾。已經有同名的東西時失敗，跟檔案總管一致。 */
+export async function makeDirectory(conn: ServerConnection, path: string): Promise<void> {
+  assertInServerDir(path)
+  const result = await conn.exec(
+    `if sudo test -e ${sq(path)}; then echo EXISTS; else ` +
+      `sudo install -d -o minecraft -g minecraft -m 755 ${sq(path)}; fi`
+  )
+  if (result.stdout.includes('EXISTS')) {
+    throw new Error(`這個位置已經有「${baseName(path)}」了`)
+  }
+  if (result.code !== 0) throw new Error(result.stderr.trim() || '建立資料夾失敗')
+}
+
+/** 重新命名。回傳新的完整路徑。 */
+export async function renameRemote(
+  conn: ServerConnection,
+  path: string,
+  newName: string
+): Promise<string> {
   assertInServerDir(path)
   if (path.replace(/\/$/, '') === REMOTE.serverDir) {
-    throw new Error('不能刪除伺服器根目錄')
+    throw new Error('不能重新命名伺服器根目錄')
   }
-  const result = await conn.exec(`sudo rm -rf ${sq(path)}`)
+  const name = newName.trim()
+  if (!name || name.includes('/') || name === '.' || name === '..') {
+    throw new Error('名稱不能是空的，也不能包含「/」')
+  }
+
+  const parent = path.replace(/\/+$/, '').slice(0, path.replace(/\/+$/, '').lastIndexOf('/'))
+  const target = `${parent}/${name}`
+  assertInServerDir(target)
+  if (target === path) return path
+
+  const result = await conn.exec(
+    `if sudo test -e ${sq(target)}; then echo EXISTS; else sudo mv -- ${sq(path)} ${sq(target)}; fi`
+  )
+  if (result.stdout.includes('EXISTS')) {
+    throw new Error(`這個位置已經有「${name}」了`)
+  }
+  if (result.code !== 0) throw new Error(result.stderr.trim() || '重新命名失敗')
+  return target
+}
+
+async function transfer(
+  conn: ServerConnection,
+  items: TransferItem[],
+  verb: 'cp -a' | 'mv',
+  failure: string
+): Promise<void> {
+  if (items.length === 0) return
+
+  const commands: string[] = []
+  for (const item of items) {
+    assertInServerDir(item.from)
+    assertInServerDir(item.to)
+    const from = item.from.replace(/\/+$/, '')
+    const to = item.to.replace(/\/+$/, '')
+
+    // 貼到自己身上等於沒做事。這不是錯誤——檔案總管也是靜靜地什麼都不做。
+    // 更重要的是不能讓它往下走：replace 會先 rm 掉去處，而去處就是來源。
+    if (to === from) continue
+    // 把資料夾放進它自己底下會無限遞迴，cp 會一路複製到磁碟塞滿
+    if (to.startsWith(`${from}/`)) throw new Error(`不能把「${baseName(from)}」放進它自己裡面`)
+
+    const clear = item.replace ? `sudo rm -rf -- ${sq(to)} && ` : ''
+    commands.push(`${clear}sudo ${verb} -- ${sq(from)} ${sq(to)}`)
+  }
+  if (commands.length === 0) return
+
+  // 一次送出整批，省下每筆一趟的 SSH 往返
+  const result = await conn.exec(commands.join(' && '))
+  if (result.code !== 0) throw new Error(result.stderr.trim() || failure)
+}
+
+/** 複製（貼上）。cp -a 以 root 執行，複本會保留 minecraft 的擁有者。 */
+export async function copyRemote(conn: ServerConnection, items: TransferItem[]): Promise<void> {
+  await transfer(conn, items, 'cp -a', '複製失敗')
+}
+
+/** 搬移（剪下貼上、拖進資料夾） */
+export async function moveRemote(conn: ServerConnection, items: TransferItem[]): Promise<void> {
+  await transfer(conn, items, 'mv', '搬移失敗')
+}
+
+export async function deleteRemoteFiles(conn: ServerConnection, paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  for (const path of paths) {
+    assertInServerDir(path)
+    if (path.replace(/\/$/, '') === REMOTE.serverDir) {
+      throw new Error('不能刪除伺服器根目錄')
+    }
+  }
+  const result = await conn.exec(`sudo rm -rf -- ${paths.map(sq).join(' ')}`)
   if (result.code !== 0) throw new Error(result.stderr.trim() || '刪除失敗')
 }
 
-export async function uploadFile(
-  conn: ServerConnection,
-  localPath: string,
-  remotePath: string
-): Promise<void> {
-  assertInServerDir(remotePath)
-  const staging = `/tmp/craftlift-${randomBytes(6).toString('hex')}`
-
-  const sftp = await conn.sftp()
-  await pipeline(createReadStream(localPath), sftp.createWriteStream(staging))
-
-  const result = await conn.exec(
-    `sudo install -o minecraft -g minecraft -m 644 ${sq(staging)} ${sq(remotePath)} && rm -f ${sq(staging)}`
-  )
-  if (result.code !== 0) throw new Error(result.stderr.trim() || '上傳失敗')
+function sftpMkdir(sftp: SFTPWrapper, path: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    sftp.mkdir(path, (err) => (err ? reject(err) : resolve()))
+  })
 }
 
-export async function downloadFile(
+function sftpReaddir(sftp: SFTPWrapper, path: string): Promise<FileEntry[]> {
+  return new Promise((resolve, reject) => {
+    sftp.readdir(path, (err, list) => (err ? reject(err) : resolve(list)))
+  })
+}
+
+/** 把一整棵本機資料夾樹送進暫存區 */
+async function uploadTree(sftp: SFTPWrapper, localDir: string, remoteDir: string): Promise<void> {
+  await sftpMkdir(sftp, remoteDir)
+  for (const entry of await readdir(localDir, { withFileTypes: true })) {
+    const local = join(localDir, entry.name)
+    const remote = `${remoteDir}/${entry.name}`
+    if (entry.isDirectory()) {
+      await uploadTree(sftp, local, remote)
+    } else if (entry.isFile()) {
+      await pipeline(createReadStream(local), sftp.createWriteStream(remote))
+    }
+    // 捷徑與其他特殊檔案跳過——它們在遠端沒有意義
+  }
+}
+
+/**
+ * 上傳一個本機檔案或資料夾。
+ *
+ * 資料夾整棵先進暫存區再一次搬過去，這樣不論幾個檔案都只花一次 sudo。
+ */
+export async function uploadPath(
+  conn: ServerConnection,
+  localPath: string,
+  remotePath: string,
+  replace = false
+): Promise<void> {
+  assertInServerDir(remotePath)
+  const staging = stagingPath()
+  const info = await stat(localPath)
+
+  try {
+    await conn.withSftp(async (sftp) => {
+      if (info.isDirectory()) {
+        await uploadTree(sftp, localPath, staging)
+      } else {
+        await pipeline(createReadStream(localPath), sftp.createWriteStream(staging))
+      }
+    })
+
+    const clear = replace ? `sudo rm -rf -- ${sq(remotePath)} && ` : ''
+    const result = await conn.exec(
+      `${clear}sudo chown -R minecraft:minecraft ${sq(staging)} && ` +
+        `sudo chmod -R u=rwX,go=rX ${sq(staging)} && ` +
+        `sudo cp -a -- ${sq(staging)} ${sq(remotePath)}`
+    )
+    if (result.code !== 0) throw new Error(result.stderr.trim() || '上傳失敗')
+  } finally {
+    // 半路失敗也要清，不然 /tmp 會慢慢被沒人認領的半成品塞滿
+    await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
+  }
+}
+
+/** 把暫存區的一棵樹抓回本機 */
+async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: string): Promise<void> {
+  await mkdir(localDir, { recursive: true })
+  for (const entry of await sftpReaddir(sftp, remoteDir)) {
+    const remote = `${remoteDir}/${entry.filename}`
+    const local = join(localDir, entry.filename)
+    // SFTP 只給 POSIX 的 mode 位元，沒有現成的 isDirectory()。
+    // 0o170000 是檔案類型那四個位元的遮罩，0o040000 就是「資料夾」。
+    if ((entry.attrs.mode & 0o170000) === 0o040000) {
+      await downloadTree(sftp, remote, local)
+    } else {
+      await pipeline(sftp.createReadStream(remote), createWriteStream(local))
+    }
+  }
+}
+
+/**
+ * 下載一個遠端檔案或資料夾。
+ *
+ * 遠端那些檔案的擁有者是 minecraft，登入的使用者讀不到，所以先用 sudo
+ * 複製一份到暫存區並改成自己的，再用 SFTP 抓回來。是不是資料夾在同一次
+ * 指令裡就問完了，不多花一趟往返。
+ */
+export async function downloadPath(
   conn: ServerConnection,
   remotePath: string,
   localPath: string
 ): Promise<void> {
   assertInServerDir(remotePath)
-  const staging = `/tmp/craftlift-${randomBytes(6).toString('hex')}`
-
-  // 先複製一份到登入使用者讀得到的地方，再用 SFTP 抓回來
-  const prep = await conn.exec(
-    `sudo cp ${sq(remotePath)} ${sq(staging)} && sudo chmod 644 ${sq(staging)}`
-  )
-  if (prep.code !== 0) throw new Error(prep.stderr.trim() || '準備下載失敗')
+  const staging = stagingPath()
 
   try {
-    const sftp = await conn.sftp()
-    await pipeline(sftp.createReadStream(staging), createWriteStream(localPath))
+    const prep = await conn.exec(
+      `sudo cp -a -- ${sq(remotePath)} ${sq(staging)} && ` +
+        `sudo chown -R $(id -u):$(id -g) ${sq(staging)} && ` +
+        `sudo chmod -R u+rwX ${sq(staging)} && ` +
+        `if test -d ${sq(staging)}; then echo DIR; else echo FILE; fi`
+    )
+    if (prep.code !== 0) throw new Error(prep.stderr.trim() || '準備下載失敗')
+
+    await conn.withSftp(async (sftp) => {
+      if (prep.stdout.includes('DIR')) {
+        await downloadTree(sftp, staging, localPath)
+      } else {
+        await pipeline(sftp.createReadStream(staging), createWriteStream(localPath))
+      }
+    })
   } finally {
-    await conn.exec(`rm -f ${sq(staging)}`)
+    // 用 sudo 刪：chown 那步若沒跑到，暫存還是 root 的，一般身分刪不掉
+    await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
   }
 }
 

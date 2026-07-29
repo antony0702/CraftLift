@@ -128,6 +128,27 @@ export interface RemoteFile {
   modifiedAt: number
 }
 
+/**
+ * 遠端複製或搬移的一筆來源與去處。
+ *
+ * 去處是完整路徑而不是「目標資料夾」，因為撞名時使用者可能選了「兩者都保留」，
+ * 那筆的檔名就會跟來源不一樣。把最終名稱在畫面那端決定完再送過來，
+ * 主行程就不用再猜。
+ */
+export interface TransferItem {
+  from: string
+  to: string
+  /** 去處已經存在時是否覆蓋。false（預設）代表呼叫端保證不會撞名。 */
+  replace?: boolean
+}
+
+/** 一筆上傳：本機的哪個檔案或資料夾，要放到遠端的哪個完整路徑 */
+export interface UploadItem {
+  localPath: string
+  remotePath: string
+  replace?: boolean
+}
+
 /** VM 上的一份備份 */
 export interface Backup {
   fileName: string
