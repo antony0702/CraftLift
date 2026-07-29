@@ -176,6 +176,8 @@ const api = {
     /** 只允許 https，主行程會再檢查一次 */
     openExternal: (url: string): Promise<Result<void>> => invoke('app:openExternal', url),
     chooseDirectory: (): Promise<Result<string | null>> => invoke('app:chooseDirectory'),
+    /** 應用程式版本 */
+    version: (): Promise<Result<string>> => invoke('app:version'),
 
     /** 目前實際採用的配色（「跟隨系統」已解析成 light 或 dark） */
     effectiveTheme: (): Promise<Result<'light' | 'dark'>> => invoke('theme:effective'),

@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
@@ -360,6 +360,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     if (!url.startsWith('https://')) throw new Error('只允許開啟 https 連結')
     await shell.openExternal(url)
   })
+
+  /** 應用程式版本，顯示在標題列旁 */
+  handle('app:version', async (): Promise<string> => app.getVersion())
 
   handle('app:chooseDirectory', async (): Promise<string | null> => {
     const window = getWindow()

@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MinecraftServer } from '@shared/types'
-import { REMOTE } from '@shared/constants'
 import { call, errorText } from '../lib/api'
 import { Blank, ErrorText, Loading } from '../components/Ui'
 import WorldBlock from '../components/WorldBlock'
 
 /**
- * 你的世界。
+ * 伺服器清單。
  *
- * 版面由內容的重要性決定，不是由清單順序決定：執行中的世界佔大版面，
- * 關機的縮成一行。多數時候你只在意那個正在跑的，介面應該反映這件事。
+ * 每台伺服器用同一種版面呈現。先前把執行中的那台放大成主角、其餘縮成
+ * 一行，結果同一份資訊在兩種尺寸下呈現，看起來像壞掉而不是有層次。
+ * 狀態的差異交給世界方塊表達——亮的在跑、暗的沒跑，那已經夠清楚了。
  */
 export default function ServerList({
   onOpen,
@@ -24,8 +24,8 @@ export default function ServerList({
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
-  /** 主角的線上人數。要連 SSH 才查得到，所以獨立於清單非同步取得。 */
-  const [players, setPlayers] = useState<number | null>(null)
+  /** 各伺服器的線上人數。要連 SSH 才問得到，所以獨立於清單非同步取得。 */
+  const [players, setPlayers] = useState<Record<string, number>>({})
 
   const refresh = useCallback(async () => {
     try {
@@ -45,33 +45,38 @@ export default function ServerList({
     return () => clearInterval(timer)
   }, [refresh])
 
-  const starName = servers.find((s) => s.state === 'RUNNING')?.name ?? null
-  const starZone = servers.find((s) => s.state === 'RUNNING')?.zone ?? null
+  // 只問正在執行的那幾台。連線本身要好幾秒，查不到就不顯示人數，
+  // 不要因為這個非必要的數字讓整張清單卡住或報錯。
+  const runningKey = servers
+    .filter((s) => s.state === 'RUNNING')
+    .map((s) => `${s.name}:${s.zone}`)
+    .join(',')
 
-  // 線上人數要連進機器才問得到，慢且可能失敗。查不到就不顯示，
-  // 不要因為這個非必要的數字而讓整張清單卡住或報錯。
   useEffect(() => {
-    if (!starName || !starZone) {
-      setPlayers(null)
-      return
-    }
+    if (!runningKey) return
     let cancelled = false
-    void (async () => {
-      try {
-        const status = await call(window.api.minecraft.status(starName, starZone))
-        if (!cancelled) setPlayers(status.playerCount)
-      } catch {
-        if (!cancelled) setPlayers(null)
-      }
-    })()
+    for (const entry of runningKey.split(',')) {
+      const [name, zone] = entry.split(':')
+      void (async () => {
+        try {
+          const status = await call(window.api.minecraft.status(name, zone))
+          if (!cancelled && status.playerCount !== null) {
+            setPlayers((prev) => ({ ...prev, [name]: status.playerCount as number }))
+          }
+        } catch {
+          // 伺服器剛開機時 RCON 尚未就緒，屬正常過渡狀態
+        }
+      })()
+    }
     return () => {
       cancelled = true
     }
-  }, [starName, starZone])
+  }, [runningKey])
 
   const copyAddress = async (server: MinecraftServer): Promise<void> => {
     if (!server.externalIp) return
-    await navigator.clipboard.writeText(`${server.externalIp}:${REMOTE.gamePort}`)
+    // 只複製位址本身。Minecraft 的預設埠就是 25565，玩家不需要打出來。
+    await navigator.clipboard.writeText(server.externalIp)
     setCopied(server.name)
     setTimeout(() => setCopied(null), 2000)
   }
@@ -84,75 +89,64 @@ export default function ServerList({
     )
   }
 
-  const running = servers.filter((s) => s.state === 'RUNNING')
-  const others = servers.filter((s) => s.state !== 'RUNNING')
-  const star = running[0] ?? null
-  const rest = star ? [...running.slice(1), ...others] : others
-
   return (
     <div className="screen">
-      <div className="eyebrow">{t('list.title')}</div>
       <ErrorText>{message}</ErrorText>
 
       {servers.length === 0 ? (
         <Blank
           action={
-            <button type="button" className="torch" onClick={onCreate}>
+            <button type="button" className="torch big" onClick={onCreate}>
               {t('list.create')}
             </button>
           }
         >
           <WorldBlock size={88} lit={false} />
           <p>{t('list.empty')}</p>
-          <p className="muted small">{t('list.emptyHint')}</p>
+          <p className="muted">{t('list.emptyHint')}</p>
         </Blank>
       ) : (
         <>
-          {star && (
-            <div className="hero">
-              <WorldBlock size={132} lit />
-              <div>
-                <h1>{star.displayName}</h1>
-                <div className="who">
-                  {players === null ? t('state.RUNNING') : t('list.playing', { count: players })}
-                </div>
-                {star.externalIp && (
-                  <button type="button" className="addr fact" onClick={() => void copyAddress(star)}>
-                    {copied === star.name ? (
-                      t('common.copied')
-                    ) : (
-                      <>
-                        {star.externalIp}
-                        <span className="port">:{REMOTE.gamePort}</span>
-                      </>
-                    )}
-                  </button>
-                )}
-                <span className="spec fact">
-                  {star.mcVersion} · {star.machineType} · {star.zone}
-                </span>
-                <div className="acts">
-                  <button type="button" className="torch" onClick={() => onOpen(star)}>
-                    {t('list.manage')}
-                  </button>
+          {servers.map((server) => {
+            const running = server.state === 'RUNNING'
+            const count = players[server.name]
+            return (
+              <div className="world-row" key={server.name}>
+                <WorldBlock size={110} lit={running} />
+                <div className="world-info">
+                  <h1>{server.displayName}</h1>
+                  <div className="who">
+                    {running
+                      ? count === undefined
+                        ? t('state.RUNNING')
+                        : t('list.playing', { count })
+                      : t(`state.${server.state}`)}
+                  </div>
+                  {server.externalIp && (
+                    <button
+                      type="button"
+                      className="addr fact"
+                      title={t('list.copyAddress')}
+                      onClick={() => void copyAddress(server)}
+                    >
+                      {copied === server.name ? t('common.copied') : server.externalIp}
+                    </button>
+                  )}
+                  <span className="spec fact">
+                    {server.mcVersion} · {server.machineType} · {server.zone}
+                  </span>
+                  <div className="acts">
+                    <button type="button" className="torch big" onClick={() => onOpen(server)}>
+                      {t('list.manage')}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {rest.map((server) => (
-            <button key={server.name} type="button" className="dorm" onClick={() => onOpen(server)}>
-              <WorldBlock size={44} lit={server.state === 'RUNNING'} />
-              <span className="n">{server.displayName}</span>
-              <span className="sp fact">
-                {server.mcVersion} · {server.machineType}
-              </span>
-              <span className="st">{t(`state.${server.state}`)}</span>
-            </button>
-          ))}
+            )
+          })}
 
           <div className="actions">
-            <button type="button" className="torch" onClick={onCreate}>
+            <button type="button" className="torch big" onClick={onCreate}>
               {t('list.create')}
             </button>
           </div>

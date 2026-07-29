@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MinecraftServer } from '@shared/types'
-import { REMOTE } from '@shared/constants'
 import { call, errorText } from '../lib/api'
 import { ErrorText, Tabs } from '../components/Ui'
 import { Back } from '../components/Icons'
@@ -102,7 +101,8 @@ export default function ServerDetail({
 
   const copyAddress = async (): Promise<void> => {
     if (!server.externalIp) return
-    await navigator.clipboard.writeText(`${server.externalIp}:${REMOTE.gamePort}`)
+    // Minecraft 的預設埠就是 25565，玩家不需要打出來
+    await navigator.clipboard.writeText(server.externalIp)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -129,15 +129,13 @@ export default function ServerDetail({
           </div>
 
           {server.externalIp && (
-            <button type="button" className="addr fact bare" onClick={() => void copyAddress()}>
-              {copied ? (
-                t('common.copied')
-              ) : (
-                <>
-                  {server.externalIp}
-                  <span className="port">:{REMOTE.gamePort}</span>
-                </>
-              )}
+            <button
+              type="button"
+              className="addr fact bare"
+              title={t('list.copyAddress')}
+              onClick={() => void copyAddress()}
+            >
+              {copied ? t('common.copied') : server.externalIp}
             </button>
           )}
 
@@ -164,7 +162,7 @@ export default function ServerDetail({
             </button>
           </div>
 
-          {running && <p className="muted small">{t('detail.shutdownNote')}</p>}
+          {running && <p className="footnote">{t('detail.shutdownNote')}</p>}
           <ErrorText>{message}</ErrorText>
         </div>
 

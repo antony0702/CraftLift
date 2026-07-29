@@ -72,11 +72,12 @@ export default {
   list: {
     loading: '正在讀取你的世界……',
     title: '你的世界',
-    create: '開一個新世界',
+    create: '建立新伺服器',
     manage: '進入管理',
     playing: '{{count}} 人在裡面',
-    empty: '這裡還沒有世界。',
-    emptyHint: '開一個，把位址給朋友，就可以一起玩了。'
+    empty: '這裡還沒有伺服器。',
+    emptyHint: '建立一台，把位址給朋友，就可以一起玩了。',
+    copyAddress: '點一下複製位址'
   },
   create: {
     defaultName: '我的伺服器',
@@ -144,7 +145,7 @@ export default {
       '確定要刪除「{{name}}」嗎？這會一併刪除機器、磁碟與固定位址，世界存檔也會消失。建議先到「備份」分頁把存檔存到電腦。',
     shutdown: '關機',
     boot: '開機',
-    delete: '刪除這個世界',
+    delete: '刪除伺服器',
     version: '版本',
     machine: '機器',
     zone: '機房',
@@ -274,6 +275,19 @@ export default {
     defaultDir: '（預設：文件\\CraftLift Backups）',
     choose: '選擇資料夾',
     project: '目前使用的專案',
+    feedback: {
+      title: '意見回饋',
+      desc: '遇到問題或有建議都可以告訴我。附上你在做什麼、預期會發生什麼、實際發生了什麼，最有幫助。',
+      subject: '標題',
+      subjectPlaceholder: '一句話說明是什麼問題',
+      name: '你的稱呼（選填）',
+      nameHint: '留下稱呼方便回覆時稱呼你。不填也沒關係。',
+      body: '問題說明',
+      bodyPlaceholder: '你在做什麼、預期會發生什麼、實際發生了什麼',
+      publicNote:
+        '按下送出會開啟瀏覽器，把內容預先填進 GitHub 的問題回報頁，你確認後再送出。內容會公開，請不要填入密碼或個人資料。',
+      send: '送出回饋'
+    },
     billing: {
       title: '費用與額度',
       note: 'CraftLift 無法讀取你的剩餘試用額度——Google 沒有提供這項查詢功能。請直接到官方頁面查看真實數字。',

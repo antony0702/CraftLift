@@ -183,6 +183,11 @@ p {
 .nowrap {
   white-space: nowrap;
 }
+.footnote {
+  font-size: 9px;
+  line-height: 18px;
+  color: var(--dust);
+}
 .eyebrow {
   font-size: 11px;
   line-height: 22px;
@@ -306,6 +311,13 @@ button.small {
   line-height: 11px;
   padding: 9px 14px;
 }
+/* 主要動作按鈕。11px 對「進入管理」「建立新伺服器」這種決定性操作
+   太不起眼，這是少數該用 22px 的地方。 */
+button.big {
+  font-size: 22px;
+  line-height: 33px;
+  padding: 11px 33px;
+}
 button.danger {
   border-color: var(--ember);
   color: var(--ember);
@@ -372,6 +384,14 @@ button.danger:hover:not(:disabled) {
 .bar .wordmark:hover {
   background: none;
 }
+/* 版本號用等寬字：它是機器產生的事實，跟 IP、時間戳同一類 */
+.version {
+  font-size: 11px;
+  color: var(--dust);
+  letter-spacing: 0;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
 .screen {
   padding: 33px 44px 44px;
 }
@@ -428,104 +448,53 @@ button.danger:hover:not(:disabled) {
   background: var(--halo-3);
 }
 
-/* ── 你的世界：主角與配角 ───────────────────────────────────── */
-.hero {
+/* ── 伺服器清單：每一台都用同一種版面 ─────────────────────────
+   先前把執行中的那台放大成主角、其餘縮成一行，同一份資訊在兩種尺寸下
+   呈現，看起來像壞掉而不是有層次。狀態的差異交給世界方塊表達就夠了。 */
+.world-row {
   display: flex;
   align-items: center;
-  gap: 66px;
-  padding: 22px 0 44px;
+  gap: 55px;
+  padding: 33px 0;
+  border-bottom: 1px solid var(--edge-soft);
   flex-wrap: wrap;
 }
-.hero .stage {
-  padding: 22px 44px;
+.world-row .stage {
+  padding: 11px 33px;
 }
-.hero .who {
-  font-size: 11px;
+.world-info {
+  flex: 1;
+  min-width: 0;
+}
+.world-info .who {
   color: var(--dust);
-  margin-top: 11px;
+  margin-top: 6px;
 }
-.hero .who b {
-  color: var(--bone);
-  font-weight: normal;
-}
-.hero .addr {
+/* 位址是要傳給朋友的東西，給它應有的份量。點一下複製。 */
+.world-info .addr {
   display: inline-block;
   margin-top: 22px;
-  font-size: 15px;
+  padding: 0 0 6px;
+  font-size: 17px;
   color: var(--bone);
-  border-bottom: 1px solid var(--edge);
-  padding-bottom: 6px;
   background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  padding-left: 0;
-  padding-right: 0;
+  border: none;
+  border-bottom: 1px solid var(--edge);
 }
-.hero .addr:hover {
+.world-info .addr:hover {
   background: none;
   border-bottom-color: var(--torch);
+  color: var(--torch);
 }
-.addr .port {
-  color: var(--dust);
-}
-.hero .spec {
+.world-info .spec {
   display: block;
-  font-size: 11px;
-  line-height: 22px;
   color: var(--dust);
-  margin-top: 22px;
+  margin-top: 14px;
 }
-.hero .acts {
+.world-info .acts {
   display: flex;
   gap: 11px;
-  margin-top: 33px;
-}
-
-.dorm {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  width: 100%;
-  padding: 22px 0;
-  text-align: left;
-  border: none;
-  border-bottom: 1px solid var(--edge-soft);
-  font-size: 11px;
-}
-.dorm:first-child {
-  border-top: 1px solid var(--edge-soft);
-}
-.dorm .n {
-  flex: 1;
-}
-.dorm .sp,
-.dorm .st {
-  font-size: 11px;
-  color: var(--dust);
-}
-
-@media (max-width: 620px) {
-  .screen {
-    padding: 22px;
-  }
-  .hero {
-    gap: 22px;
-  }
-  .hero .stage {
-    padding: 11px;
-  }
-  .tiers {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .figures {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 11px;
-  }
-  /* 關機的世界在窄視窗下把規格藏起來，留下名稱與狀態就好 */
-  .dorm .sp {
-    display: none;
-  }
+  margin-top: 22px;
 }
 
 /* ── 主控台：左欄是什麼，右欄正在發生什麼 ──────────────────── */

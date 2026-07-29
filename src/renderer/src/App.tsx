@@ -22,8 +22,15 @@ export default function App(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [route, setRoute] = useState<Route>({ name: 'setup' })
   const [projectId, setProjectId] = useState<string | null>(null)
+  const [version, setVersion] = useState('')
 
   useTheme()
+
+  useEffect(() => {
+    void window.api.app.version().then((r) => {
+      if (r.ok) setVersion(r.data)
+    })
+  }, [])
 
   // 啟動時套用使用者上次選的語言
   useEffect(() => {
@@ -62,6 +69,7 @@ export default function App(): React.JSX.Element {
             </g>
           </svg>
           {t('app.name')}
+          {version && <span className="version fact">v{version}</span>}
         </button>
 
         <div className="grow" />

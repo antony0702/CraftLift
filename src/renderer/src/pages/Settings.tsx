@@ -42,6 +42,33 @@ export default function Settings({
   const [prefs, setPrefs] = useState<Preferences | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState({ subject: '', name: '', body: '' })
+
+  /**
+   * 送出使用者回饋。
+   *
+   * 目前的做法是開啟瀏覽器、把內容預先填進一則 GitHub issue。這樣不需要
+   * 任何伺服器、不需要在開源的程式碼裡藏任何金鑰（藏了也等於公開），
+   * 回饋也直接落在會處理它的地方。
+   *
+   * 代價是回饋會公開，而且需要 GitHub 帳號。若要改成非公開的收件方式，
+   * 只需要換掉這個函式，表單本身不用動。
+   */
+  const sendFeedback = async (): Promise<void> => {
+    const version = await call(window.api.app.version())
+    const from = feedback.name.trim() ? `\n\n— ${feedback.name.trim()}` : ''
+    const body =
+      `${feedback.body.trim()}${from}\n\n---\nCraftLift v${version}\n` +
+      `${navigator.userAgent.includes('Windows') ? 'Windows' : navigator.platform}`
+
+    const url =
+      'https://github.com/antony0702/CraftLift/issues/new' +
+      `?title=${encodeURIComponent(feedback.subject.trim())}` +
+      `&body=${encodeURIComponent(body)}`
+
+    await call(window.api.app.openExternal(url))
+    setFeedback({ subject: '', name: '', body: '' })
+  }
 
   useEffect(() => {
     void (async () => {
@@ -170,6 +197,50 @@ export default function Settings({
           </button>
         </div>
       </Field>
+
+      <div className="eyebrow" style={{ marginTop: 44 }}>
+        {t('settings.feedback.title')}
+      </div>
+      <p className="muted">{t('settings.feedback.desc')}</p>
+
+      <Field label={t('settings.feedback.subject')}>
+        <input
+          type="text"
+          value={feedback.subject}
+          maxLength={80}
+          placeholder={t('settings.feedback.subjectPlaceholder')}
+          onChange={(e) => setFeedback({ ...feedback, subject: e.target.value })}
+        />
+      </Field>
+
+      <Field label={t('settings.feedback.name')} hint={t('settings.feedback.nameHint')}>
+        <input
+          type="text"
+          value={feedback.name}
+          maxLength={40}
+          onChange={(e) => setFeedback({ ...feedback, name: e.target.value })}
+        />
+      </Field>
+
+      <Field label={t('settings.feedback.body')}>
+        <textarea
+          rows={6}
+          value={feedback.body}
+          placeholder={t('settings.feedback.bodyPlaceholder')}
+          onChange={(e) => setFeedback({ ...feedback, body: e.target.value })}
+        />
+      </Field>
+
+      <p className="footnote">{t('settings.feedback.publicNote')}</p>
+      <div className="actions">
+        <button
+          type="button"
+          disabled={!feedback.subject.trim() || !feedback.body.trim()}
+          onClick={() => void sendFeedback()}
+        >
+          {t('settings.feedback.send')}
+        </button>
+      </div>
 
       <div className="eyebrow" style={{ marginTop: 44 }}>
         {t('settings.billing.title')}

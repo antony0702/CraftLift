@@ -74,11 +74,12 @@ export default {
   list: {
     loading: 'Loading your worlds…',
     title: 'Your worlds',
-    create: 'Start a new world',
+    create: 'Create a server',
     manage: 'Manage',
     playing: '{{count}} playing',
-    empty: 'No worlds here yet.',
-    emptyHint: 'Start one, send your friends the address, and you are playing together.'
+    empty: 'No servers here yet.',
+    emptyHint: 'Create one, send your friends the address, and you are playing together.',
+    copyAddress: 'Click to copy the address'
   },
   create: {
     defaultName: 'My server',
@@ -147,7 +148,7 @@ export default {
       'Delete “{{name}}”? This removes the machine, its disk and its fixed address. The world will be gone too. Consider saving a backup to your PC first.',
     shutdown: 'Shut down',
     boot: 'Start',
-    delete: 'Delete this world',
+    delete: 'Delete server',
     version: 'Version',
     machine: 'Machine',
     zone: 'Data centre',
@@ -288,6 +289,19 @@ export default {
     defaultDir: '(default: Documents\\CraftLift Backups)',
     choose: 'Choose folder',
     project: 'Current project',
+    feedback: {
+      title: 'Send feedback',
+      desc: 'Tell me about problems or ideas. What you were doing, what you expected, and what actually happened is the most useful thing you can write.',
+      subject: 'Subject',
+      subjectPlaceholder: 'One line describing the problem',
+      name: 'Your name (optional)',
+      nameHint: 'So I know what to call you in a reply. Leave it blank if you prefer.',
+      body: 'Details',
+      bodyPlaceholder: 'What you were doing, what you expected, what actually happened',
+      publicNote:
+        'Sending opens your browser with a GitHub issue pre-filled; you confirm before it posts. The content becomes public — do not include passwords or personal data.',
+      send: 'Send feedback'
+    },
     billing: {
       title: 'Cost and credit',
       note: 'CraftLift cannot read your remaining trial credit — Google provides no API for it. Check the real figure on the official page.',
