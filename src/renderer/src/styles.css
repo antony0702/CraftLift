@@ -765,16 +765,7 @@ button.danger:hover:not(:disabled) {
   color: var(--ember);
 }
 .file-name {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 11px;
   color: var(--bone);
-  text-align: left;
-}
-.file-name:hover {
-  background: none;
-  color: var(--torch);
 }
 .path {
   font-size: 11px;
@@ -789,6 +780,194 @@ button.danger:hover:not(:disabled) {
   gap: 11px;
   margin-bottom: 11px;
   flex-wrap: wrap;
+}
+
+/* ── 檔案總管 ─────────────────────────────────────────────────
+   操作邏輯照抄 Windows 檔案總管（單擊選取、雙擊開啟、右鍵選單、拖放），
+   但視覺仍然是這套石頭與光。選取不用系統的藍色高亮——藍色在這張色票裡
+   沒有位置，而且「這一列跟其他列不一樣」用石頭的明度差就講得完。 */
+.files {
+  /* 這個容器 focusable 只是為了收鍵盤事件，不該因此畫出焦點框 */
+  outline: none;
+}
+.explorer {
+  border: 1px solid var(--edge-soft);
+  border-top: none;
+  min-height: 154px;
+}
+/* 檔案清單整片用等寬字。
+   點陣字是給「人講的話」的，而清單裡從頭到尾都是機器產生的事實——
+   檔名、時間戳、位元組數。先前只有時間和大小掛等寬，檔名跟欄位標題
+   還是點陣，同一張表格兩種字看起來像沒做完。整片統一才讀得順，
+   而且等寬字的數字對得齊，掃描一整欄大小時差很多。 */
+.files-table {
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.02em;
+}
+.files-table th {
+  padding: 0;
+  border-bottom: 1px solid var(--edge);
+}
+.col-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 11px;
+  border: none;
+  color: var(--dust);
+  text-align: left;
+}
+.col-head:hover:not(:disabled) {
+  background: var(--stone-800);
+  color: var(--bone);
+}
+/* 排序方向的小三角。9px 不在 11 的倍數上，但它是符號不是字，不受點陣格線約束。 */
+.col-head i {
+  font-style: normal;
+  font-size: 9px;
+}
+.files-table td {
+  padding: 5px 11px;
+}
+.files-table .row {
+  cursor: default;
+}
+.files-table .row:hover td {
+  background: var(--stone-800);
+}
+.files-table .row.picked td {
+  background: var(--stone-700);
+  color: var(--bone);
+}
+/* 已剪下、還沒貼上的項目變淡——這是檔案總管的講法 */
+.files-table .row.cut td {
+  opacity: 0.4;
+}
+/* 拖到這個資料夾上面。用光的顏色講「東西會掉進這裡」，是橘色少數該出現的位置。 */
+.files-table .row.drop td {
+  background: var(--stone-700);
+  box-shadow:
+    inset 0 1px 0 var(--torch),
+    inset 0 -1px 0 var(--torch);
+}
+.glyph {
+  margin-right: 6px;
+}
+.right {
+  text-align: right;
+}
+.rename {
+  width: 220px;
+  padding: 0 5px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--bone);
+  background: var(--void);
+  border: 1px solid var(--torch);
+}
+.rename:focus {
+  outline: none;
+}
+
+/* 位址列。路徑是機器產生的事實，用等寬字。 */
+.crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.crumb {
+  padding: 0 5px;
+  border: none;
+  font-family: 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  color: var(--dust);
+}
+.crumb:hover:not(:disabled) {
+  background: var(--stone-700);
+  color: var(--bone);
+}
+.crumb[aria-current='true'] {
+  color: var(--bone);
+}
+.crumb-sep {
+  font-style: normal;
+  color: var(--edge);
+}
+
+/* 狀態列：幾個項目、選了幾個、正在忙什麼 */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 11px;
+  padding-top: 5px;
+  border-top: 1px solid var(--edge-soft);
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--dust);
+}
+.statusbar .busy {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--bone);
+}
+
+/* 右鍵選單。硬邊、方角、實心陰影——不模仿系統選單的樣子，
+   它模仿的是系統選單的「行為」。 */
+.menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 176px;
+  padding: 5px 0;
+  background: var(--stone-800);
+  border: 1px solid var(--edge);
+  box-shadow: 4px 4px 0 var(--void);
+}
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 3px 22px;
+  border: none;
+  text-align: left;
+}
+.menu button:hover:not(:disabled) {
+  background: var(--stone-700);
+}
+.menu button.danger {
+  color: var(--ember);
+}
+.menu button.danger:hover:not(:disabled) {
+  background: var(--stone-700);
+  color: var(--ember);
+}
+.menu hr {
+  margin: 5px 0;
+  border: none;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.plain-list {
+  margin: 11px 0;
+  padding: 0;
+  list-style: none;
+}
+.details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 22px;
+  margin: 0;
+}
+.details dt {
+  color: var(--dust);
+}
+.details dd {
+  margin: 0;
+  word-break: break-all;
 }
 
 /* ── 提示與空狀態 ───────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AuthStatus,
   Backup,
@@ -15,7 +15,9 @@ import type {
   RemoteFile,
   Result,
   ServerProperties,
-  UpdateState
+  TransferItem,
+  UpdateState,
+  UploadItem
 } from '@shared/types'
 
 /**
@@ -127,18 +129,47 @@ const api = {
   files: {
     list: (name: string, zone: string, path: string): Promise<Result<RemoteFile[]>> =>
       invoke('files:list', name, zone, path),
+    /** 某個資料夾裡已經用掉的名稱。貼上與上傳前用來判斷會不會撞名。 */
+    names: (name: string, zone: string, dir: string): Promise<Result<string[]>> =>
+      invoke('files:names', name, zone, dir),
     read: (name: string, zone: string, path: string): Promise<Result<string>> =>
       invoke('files:read', name, zone, path),
     write: (name: string, zone: string, path: string, content: string): Promise<Result<void>> =>
       invoke('files:write', name, zone, path, content),
-    delete: (name: string, zone: string, path: string): Promise<Result<void>> =>
-      invoke('files:delete', name, zone, path),
-    /** 開檔案選擇視窗並上傳。回傳檔名，使用者取消時回傳 null。 */
-    upload: (name: string, zone: string, remoteDir: string): Promise<Result<string | null>> =>
-      invoke('files:upload', name, zone, remoteDir),
-    /** 開儲存視窗並下載。回傳存檔路徑，使用者取消時回傳 null。 */
-    download: (name: string, zone: string, remotePath: string): Promise<Result<string | null>> =>
-      invoke('files:download', name, zone, remotePath)
+    /** 一次刪除多個。資料夾連同底下的東西一起刪。 */
+    delete: (name: string, zone: string, paths: string[]): Promise<Result<void>> =>
+      invoke('files:delete', name, zone, paths),
+    mkdir: (name: string, zone: string, path: string): Promise<Result<void>> =>
+      invoke('files:mkdir', name, zone, path),
+    /** 重新命名，回傳新的完整路徑 */
+    rename: (name: string, zone: string, path: string, newName: string): Promise<Result<string>> =>
+      invoke('files:rename', name, zone, path, newName),
+    copy: (name: string, zone: string, items: TransferItem[]): Promise<Result<void>> =>
+      invoke('files:copy', name, zone, items),
+    move: (name: string, zone: string, items: TransferItem[]): Promise<Result<void>> =>
+      invoke('files:move', name, zone, items),
+    /** 開檔案選擇視窗，只回傳選到的本機路徑，還沒上傳 */
+    pick: (): Promise<Result<string[]>> => invoke('files:pick'),
+    /** 同上，但選的是資料夾 */
+    pickDirectory: (): Promise<Result<string[]>> => invoke('files:pickDirectory'),
+    upload: (name: string, zone: string, items: UploadItem[]): Promise<Result<void>> =>
+      invoke('files:upload', name, zone, items),
+    /**
+     * 下載。單一檔案會開「另存新檔」，多選或資料夾會開「選擇資料夾」。
+     * 回傳實際存到的位置，使用者取消時回傳 null。
+     */
+    download: (name: string, zone: string, remotePaths: string[]): Promise<Result<string | null>> =>
+      invoke('files:download', name, zone, remotePaths),
+    /** 在檔案總管裡指出剛下載的東西 */
+    reveal: (localPath: string): Promise<Result<void>> => invoke('files:reveal', localPath),
+    /**
+     * 從檔案總管拖進來的檔案在磁碟上的位置。
+     *
+     * 畫面本身拿不到 File 的實際路徑（Electron 已經移除 File.path），
+     * 只能由這裡代問。這不算開後門——它只回答「使用者剛剛親手拖進來的
+     * 那個檔案在哪」，問不出其他路徑。
+     */
+    pathOf: (file: File): string => webUtils.getPathForFile(file)
   },
 
   /** 備份 */

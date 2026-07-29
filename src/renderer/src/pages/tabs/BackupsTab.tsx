@@ -60,7 +60,7 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
 
   const download = async (backup: Backup): Promise<void> => {
     try {
-      await call(window.api.files.download(server.name, server.zone, backup.path))
+      await call(window.api.files.download(server.name, server.zone, [backup.path]))
     } catch (err) {
       setMessage(errorText(err))
     }

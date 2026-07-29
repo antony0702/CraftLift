@@ -167,10 +167,23 @@ export class ServerConnection {
     })
   }
 
-  sftp(): Promise<SFTPWrapper> {
-    return new Promise((resolve, reject) => {
-      this.client.sftp((err, sftp) => (err ? reject(err) : resolve(sftp)))
+  /**
+   * 借一條 SFTP 通道，用完立刻還。
+   *
+   * 每呼叫一次 sftp() 就會在這條 SSH 連線上開一個新通道，而 OpenSSH 預設
+   * 同時只允許十個（MaxSessions 10）。連線是長期重複使用的，通道借了不還
+   * 就會愈積愈多，第十一次檔案操作開始整組功能會突然壞掉，錯誤訊息只有
+   * 一句沒頭沒尾的「Channel open failure」。所以出入口只留這一個。
+   */
+  async withSftp<T>(fn: (sftp: SFTPWrapper) => Promise<T>): Promise<T> {
+    const sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
+      this.client.sftp((err, handle) => (err ? reject(err) : resolve(handle)))
     })
+    try {
+      return await fn(sftp)
+    } finally {
+      sftp.end()
+    }
   }
 
   /**
