@@ -14,7 +14,8 @@ import type {
   PriceEstimate,
   RemoteFile,
   Result,
-  ServerProperties
+  ServerProperties,
+  UpdateState
 } from '@shared/types'
 
 /**
@@ -167,6 +168,29 @@ const api = {
       action: PlayerAction,
       player: string
     ): Promise<Result<string>> => invoke('players:modify', name, zone, action, player)
+  },
+
+  /**
+   * 自動更新。
+   *
+   * 這裡刻意沒有「直接安裝」以外的入口——畫面不能自己決定去下載或執行
+   * 任何東西，只能請主行程走 electron-updater 那條有校驗碼把關的路。
+   */
+  update: {
+    /** 目前狀態。畫面重新掛載時用這個補回背景進度。 */
+    state: (): Promise<Result<UpdateState>> => invoke('update:state'),
+    /** 手動檢查。結果由 onChange 送回來。 */
+    check: (): Promise<Result<void>> => invoke('update:check'),
+    /** 使用者同意後才呼叫 */
+    download: (): Promise<Result<void>> => invoke('update:download'),
+    /** 重開並安裝。呼叫後程式就會結束。 */
+    install: (): Promise<Result<void>> => invoke('update:install'),
+    /** 訂閱更新狀態變化。回傳取消訂閱的函式。 */
+    onChange: (handler: (state: UpdateState) => void): (() => void) => {
+      const listener = (_e: unknown, state: UpdateState): void => handler(state)
+      ipcRenderer.on('update:changed', listener)
+      return () => ipcRenderer.removeListener('update:changed', listener)
+    }
   },
 
   /** 偏好設定與雜項 */

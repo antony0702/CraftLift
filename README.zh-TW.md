@@ -49,6 +49,24 @@ Google 規定：建立 Google 帳號、綁定信用卡，這兩件事必須由�
 - `server.properties` 圖形化編輯、玩家管理（白名單／管理員／封鎖）
 - 想自己動手時可用的 SSH 終端機
 
+## 更新
+
+CraftLift 會自己去 [GitHub Releases](https://github.com/antony0702/CraftLift/releases) 查有沒有新版，
+啟動十幾秒後查一次，也可以在「設定 → 軟體更新」隨時手動檢查。
+
+查到新版時只會在視窗上方出現一條提示，**不會自己下載，也不會自己安裝**——
+要不要下載、什麼時候重開安裝，兩步都由你按。下載的檔案會用 Release 裡的
+SHA512 校驗，對不上就中止。
+
+更新只換掉程式本身。以下這些都不在安裝目錄裡，所以不會被動到：
+
+| 東西 | 放在哪 |
+| --- | --- |
+| 偏好設定 | `%APPDATA%\CraftLift\preferences.json` |
+| Google Cloud 登入憑證與 SSH 金鑰 | `~\.ssh`（由 Google Cloud CLI 管理） |
+| 本機備份 | `文件\CraftLift Backups`（可在設定裡改） |
+| 伺服器、世界存檔 | 在你的 Google Cloud 上 |
+
 ## 開發狀態
 
 早期開發中，尚無法使用。

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { Preferences, ThemeChoice } from '@shared/types'
 import { BILLING_CONSOLE_URL } from '@shared/constants'
 import { call, errorText } from '../lib/api'
+import { formatSize, useUpdate } from '../lib/update'
 import { ErrorText, Field, Info, Loading, Modal, Waiting } from '../components/Ui'
 import { Back } from '../components/Icons'
 import { supportedLanguages } from '../i18n'
@@ -47,6 +48,8 @@ export default function Settings({
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
+  const [version, setVersion] = useState('')
+  const updater = useUpdate()
 
   /**
    * 送出回饋。
@@ -87,6 +90,9 @@ export default function Settings({
         setMessage(errorText(err))
       }
     })()
+    void window.api.app.version().then((r) => {
+      if (r.ok) setVersion(r.data)
+    })
   }, [])
 
   const update = async (patch: Partial<Preferences>): Promise<void> => {
@@ -206,6 +212,66 @@ export default function Settings({
           </button>
         </div>
       </Field>
+
+      <div className="eyebrow" style={{ marginTop: 44 }}>
+        {t('update.title')}
+      </div>
+      <p className="muted small">
+        {t('update.current')} <span className="fact">v{version}</span>
+      </p>
+      <p className="muted small">{t('update.safeNote')}</p>
+
+      {/* 狀態一行講完。這裡不重複標題列的提示條，只補上那條看不到的資訊
+          ——「查過了，你已經是最新的」以及失敗原因。 */}
+      {updater.state.phase === 'checking' && <p className="small">{t('update.checking')}</p>}
+      {updater.state.phase === 'latest' && <p className="small">{t('update.latest')}</p>}
+      {updater.state.phase === 'unsupported' && (
+        <p className="muted small">{t('update.unsupported')}</p>
+      )}
+      {updater.state.phase === 'downloading' && (
+        <p className="small">
+          {t('update.downloading')} <span className="fact">{updater.state.percent}%</span>
+        </p>
+      )}
+      {updater.state.phase === 'error' && <ErrorText>{updater.state.message}</ErrorText>}
+
+      {updater.state.phase === 'available' && (
+        <>
+          <p className="small">
+            {t('update.available', { version: updater.state.version })}
+            {formatSize(updater.state.sizeBytes) && (
+              <span className="fact size">{formatSize(updater.state.sizeBytes)}</span>
+            )}
+          </p>
+          {/* 版本說明是人寫給人看的，所以用點陣字，只把換行留住 */}
+          {updater.state.notes && <div className="release-notes">{updater.state.notes}</div>}
+        </>
+      )}
+
+      <div className="actions">
+        <button
+          type="button"
+          disabled={
+            updater.state.phase === 'checking' ||
+            updater.state.phase === 'downloading' ||
+            updater.state.phase === 'unsupported'
+          }
+          onClick={updater.check}
+        >
+          {t('update.check')}
+        </button>
+        {updater.state.phase === 'available' && (
+          <button type="button" className="torch" onClick={updater.download}>
+            {t('update.download')}
+          </button>
+        )}
+        {updater.state.phase === 'ready' && (
+          <button type="button" className="torch" onClick={updater.install}>
+            {t('update.install')}
+          </button>
+        )}
+        {(updater.state.phase === 'checking' || updater.state.phase === 'downloading') && <Waiting />}
+      </div>
 
       <div className="eyebrow" style={{ marginTop: 44 }}>
         {t('settings.feedback.title')}

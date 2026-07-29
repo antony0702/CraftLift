@@ -392,6 +392,52 @@ button.danger:hover:not(:disabled) {
   align-self: flex-end;
   padding-bottom: 2px;
 }
+/* ── 更新提示 ─────────────────────────────────────────────────
+   橫貫在視窗列下方。它講的是整個程式的事，不屬於任何一個畫面，
+   所以放在畫面之外、視窗列之下。高度 44 = 11×4，仍然對齊同一張格線。
+   刻意不做成彈窗：使用者很可能正在等一台機器開機。 */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 44px;
+  padding: 0 22px;
+  font-size: 11px;
+  line-height: 22px;
+  background: var(--stone-800);
+  border-bottom: 1px solid var(--edge-soft);
+}
+/* 檔案大小與百分比跟在句子後面，是事實不是話語 */
+.size {
+  margin-left: 11px;
+  color: var(--dust);
+}
+/* 下載進度。逐格點亮，跟等待指示與世界方塊的光池是同一套語言。
+   這裡的橘色算在「光」的預算裡——所以下載途中這一列不會再出現
+   第二個橘色元素（按鈕在那個階段本來就不該在）。 */
+.meter {
+  display: flex;
+  gap: 2px;
+}
+.meter i {
+  width: 5px;
+  height: 11px;
+  background: var(--edge);
+}
+.meter i.on {
+  background: var(--torch);
+}
+/* 版本說明是人寫給人看的，所以留在點陣字，只保留作者排的換行 */
+.release-notes {
+  white-space: pre-wrap;
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--dust);
+  border-left: 2px solid var(--edge);
+  padding-left: 11px;
+  margin: 0 0 11px;
+}
+
 .screen {
   padding: 33px 44px 44px;
 }

@@ -14,7 +14,8 @@ import type {
   PriceEstimate,
   RemoteFile,
   Result,
-  ServerProperties
+  ServerProperties,
+  UpdateState
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
 import { applyZoom } from './zoom'
@@ -49,6 +50,7 @@ import {
   getPreferences,
   setPreferences
 } from './preferences'
+import { checkForUpdate, downloadUpdate, getUpdateState, installUpdate } from './updater'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -365,6 +367,15 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   /** 應用程式版本，顯示在標題列旁 */
   handle('app:version', async (): Promise<string> => app.getVersion())
+
+  // --- 自動更新 -------------------------------------------------------------
+  // 進度與結果都透過 update:state 事件推給畫面，這幾個 handler 只負責觸發。
+  // 畫面重新掛載時用 update:state 這個查詢把目前狀態補回來，不然重開設定頁
+  // 會看到「還沒檢查過」，但背景其實正在下載。
+  handle('update:state', async (): Promise<UpdateState> => getUpdateState())
+  handle('update:check', async (): Promise<void> => checkForUpdate())
+  handle('update:download', async (): Promise<void> => downloadUpdate())
+  handle('update:install', async (): Promise<void> => installUpdate())
 
   // --- 意見回饋 -------------------------------------------------------------
   handle('feedback:send', async (input: FeedbackInput): Promise<void> => submitFeedback(input))

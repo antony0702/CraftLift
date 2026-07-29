@@ -55,6 +55,25 @@ usage and charges.** See the [licence](LICENSE) for the full disclaimer.
 - Graphical `server.properties` editor and player (whitelist / op / ban) management
 - An SSH terminal for when you want to get your hands dirty
 
+## Updates
+
+CraftLift checks [GitHub Releases](https://github.com/antony0702/CraftLift/releases) for a newer
+version a few seconds after launch, and you can check any time under **Settings → Software update**.
+
+When one is found you get a single line at the top of the window. It **does not download and does
+not install on its own** — both steps are yours to press. The download is verified against the
+SHA512 recorded in the release, and is discarded if it does not match.
+
+An update replaces the application only. None of the following live in the install directory, so
+none of them are touched:
+
+| Data | Location |
+| --- | --- |
+| Preferences | `%APPDATA%\CraftLift\preferences.json` |
+| Google Cloud credentials and SSH key | `~\.ssh` (managed by the Google Cloud CLI) |
+| Local backups | `Documents\CraftLift Backups` (configurable) |
+| Servers and world saves | On your Google Cloud account |
+
 ## Status
 
 Early development. Not yet usable.

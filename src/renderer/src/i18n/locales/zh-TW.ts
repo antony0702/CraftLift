@@ -259,6 +259,22 @@ export default {
     empty: '（還沒有任何備份）',
     saveToPc: '存到電腦'
   },
+  update: {
+    title: '軟體更新',
+    current: '目前版本',
+    safeNote:
+      '更新只會換掉程式本身。你的設定、電腦上的備份，以及雲端上的伺服器都不會被動到。',
+    check: '檢查更新',
+    checking: '正在檢查……',
+    latest: '已經是最新版本。',
+    unsupported: '開發模式不檢查更新。',
+    available: '有新版本 {{version}}',
+    download: '下載更新',
+    downloading: '下載中',
+    ready: '{{version}} 已下載完成，重新啟動就會套用',
+    install: '重新啟動並安裝',
+    later: '稍後'
+  },
   settings: {
     general: '一般設定',
     theme: '介面配色',

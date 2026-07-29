@@ -4,6 +4,7 @@ import { registerIpcHandlers } from './ipc'
 import { applyLaunchAtLogin, applyTheme, effectiveTheme, getPreferences } from './preferences'
 import { applyZoom, bindZoomTarget } from './zoom'
 import { closeAllConnections } from './server/ssh'
+import { initUpdater } from './updater'
 
 /**
  * 系統匣圖示：世界方塊的 32×32 版本。
@@ -156,6 +157,17 @@ if (!app.requestSingleInstanceLock()) {
     const startHidden = process.argv.includes('--hidden')
     createWindow(!startHidden)
     createTray()
+
+    // 更新的安裝會叫 app.quit()，但這個程式的視窗是「關閉即縮到系統匣」。
+    // prepareQuit 先解除那道攔截並收掉 SSH 連線，否則舊版永遠不會退出，
+    // 安裝程式也就一直等在那裡。
+    initUpdater({
+      getWindow: () => mainWindow,
+      prepareQuit: () => {
+        isQuitting = true
+        closeAllConnections()
+      }
+    })
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow(true)

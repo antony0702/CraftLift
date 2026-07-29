@@ -1,0 +1,85 @@
+name: Release
+
+# 打上 v 開頭的標籤才會跑。平常推 main 只跑 build.yml 拿產物，
+# 這支才是「要給使用者」的那條路：產物會上傳到 GitHub Releases，
+# 程式裡的自動更新就是去讀那裡的 latest.yml。
+on:
+  push:
+    tags:
+      - 'v*'
+
+# electron-builder 要把檔案傳到 Releases，需要寫入權限。
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v5
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # 版本號的唯一來源是 package.json，標籤只是蓋章。
+      # 兩邊對不起來時要當場失敗——不然會發出一個標籤寫 v1.0.1、
+      # 檔名與更新檢查卻是 1.0.0 的版本，而且沒有人會發現。
+      - name: 確認標籤與 package.json 版本一致
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $pkg = (Get-Content package.json | ConvertFrom-Json).version
+          if ($tag -ne $pkg) {
+            Write-Error "標籤是 $tag，但 package.json 寫的是 $pkg。請先讓兩者一致再打標籤。"
+            exit 1
+          }
+          Write-Host "版本一致：$pkg"
+
+      - name: 安裝相依套件
+        run: npm ci
+
+      - name: 確認 Electron 執行檔存在
+        shell: pwsh
+        run: |
+          if (-not (Test-Path node_modules/electron/dist/electron.exe)) {
+            Write-Host "Electron 執行檔不存在，重新下載"
+            node node_modules/electron/install.js
+          }
+
+      - name: 型別檢查
+        run: npm run typecheck
+
+      # --publish always：建置完成後把安裝檔、blockmap 與 latest.yml
+      # 一起送上去。latest.yml 是自動更新唯一會讀的檔案，少了它，
+      # 已安裝的使用者永遠看不到這一版。
+      - name: 建置並上傳到 Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build
+          npx electron-builder --win --publish always
+
+      # 校驗碼給「自己去下載安裝檔」的人用。自動更新走的是 latest.yml
+      # 裡的 SHA512，那條路已經有把關，這份是給人手動核對的。
+      - name: 產生並上傳 SHA256 校驗碼
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $files = Get-ChildItem release/*.exe
+          foreach ($f in $files) {
+            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
+            "$hash  $($f.Name)" | Out-File -FilePath "release/SHA256SUMS.txt" -Append -Encoding utf8
+            Write-Host "$hash  $($f.Name)"
+          }
+          gh release upload ${{ github.ref_name }} release/SHA256SUMS.txt --clobber
+
+      # 這一版停在草稿狀態。到 Releases 頁面確認內容後按下 Publish，
+      # 使用者端的更新檢查才會看到它。
+      - name: 提醒
+        run: echo "已建立草稿 Release ${{ github.ref_name }}。到 GitHub 上確認後按 Publish 才會發送給使用者。"

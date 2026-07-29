@@ -12,6 +12,18 @@ files:
   - out/**
   - package.json
 
+# 更新來源。electron-builder 會依這段產生 out 裡的 app-update.yml，
+# 程式執行時就是靠它知道要去哪裡找新版。
+#
+# releaseType: draft —— 建置完成後停在草稿，由人按下發佈。
+# 這跟 build.yml 的立場一致：我們只要產物，要不要送到使用者手上由人決定。
+# 附帶的好處是使用者不會在你還沒檢查過的時候就收到更新提示。
+publish:
+  provider: github
+  owner: antony0702
+  repo: CraftLift
+  releaseType: draft
+
 win:
   target:
     - nsis
