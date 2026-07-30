@@ -298,10 +298,36 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
         const conn = await getConnection(projectId, name, zone)
         await ops.createBackup(conn)
         const backups = await ops.listBackups(conn)
-        if (backups[0]) {
-          const dir = prefs.localBackupDir ?? defaultLocalBackupDir()
-          await mkdir(dir, { recursive: true })
-          await ops.downloadPath(conn, backups[0].path, join(dir, backups[0].fileName))
+        const dir = prefs.localBackupDir ?? defaultLocalBackupDir()
+        await mkdir(dir, { recursive: true })
+
+        // 兩包分開挑。以前這裡拿的是 backups[0]，現在備份資料夾裡除了
+        // 世界還有模組與設定，照時間拿最新的那個會變成「有時候帶回世界、
+        // 有時候帶回模組」——而使用者完全看不出來少了哪一份。
+        const newest = (prefix: string): (typeof backups)[number] | undefined =>
+          backups.find((b) => b.fileName.startsWith(prefix))
+
+        for (const prefix of ['world-', 'setup-']) {
+          const target = newest(prefix)
+          if (!target) continue
+          const localPath = join(dir, target.fileName)
+          // 一包失敗不能拖累另一包。世界很大、比較容易在傳輸中途斷掉，
+          // 而模組那包才是「到期之後想重建伺服器」真正需要的東西——
+          // 讓前者的失敗把後者一起吃掉，等於整個設計白做。
+          try {
+            // 模組那一包只有內容變了才會產生新檔名，所以本機已經有同一份
+            // 就不用再傳一次——幾百 MB 走 SFTP 要好幾分鐘，而使用者正在
+            // 等關機完成。
+            await access(localPath)
+            continue
+          } catch {
+            // 本機還沒有，往下傳
+          }
+          try {
+            await ops.downloadPath(conn, target.path, localPath)
+          } catch {
+            // 記不下來也要繼續下一包
+          }
         }
       } catch {
         // 忽略：備份失敗不應該讓使用者關不了機

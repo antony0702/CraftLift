@@ -254,6 +254,38 @@ fi
 # 只保留最新的幾份，避免把磁碟塞爆
 ls -1t "$DIR"/backups/world-*.tar.gz 2>/dev/null | tail -n +$((${BACKUP_KEEP} + 1)) | xargs -r rm -f
 echo "備份完成: world-$STAMP.tar.gz"
+
+# --- 模組與設定 ---
+#
+# 跟世界分開包，因為兩者的變化頻率差很多：世界每幾小時就不一樣，模組與
+# 設定幾乎不動，但一動就是幾百 MB。混在一起的話，每次自動備份都要重新
+# 壓縮整包模組，而且拉回本機時每次都得重傳一次。
+#
+# 所以只有內容真的變了才重打。判斷依據是「檔名＋大小＋修改時間」的清單，
+# 不對檔案內容算雜湊——對幾百 MB 的模組算 sha256 比重打包還慢。
+SIG_FILE="$DIR/.craftlift-setup-sig"
+SIG=$( { find "$DIR/mods" -type f -printf '%P\\t%s\\t%T@\\n' 2>/dev/null | sort
+         for f in server.properties whitelist.json ops.json banned-players.json; do
+           [ -f "$DIR/$f" ] && stat -c '%n %s %Y' "$DIR/$f"
+         done
+       } | md5sum | cut -d' ' -f1 )
+
+if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ]; then
+  CONFIGS=""
+  for f in server.properties whitelist.json ops.json banned-players.json; do
+    [ -f "$DIR/$f" ] && CONFIGS="$CONFIGS $f"
+  done
+  # mods 在原版伺服器上不存在，這時候這一包就只有設定檔，一樣有價值
+  [ -d "$DIR/mods" ] && CONFIGS="mods$CONFIGS"
+  if [ -n "$CONFIGS" ]; then
+    tar -czf "$DIR/backups/setup-$STAMP.tar.gz" -C "$DIR" $CONFIGS 2>/dev/null && \\
+      echo "$SIG" > "$SIG_FILE"
+    ls -1t "$DIR"/backups/setup-*.tar.gz 2>/dev/null | tail -n +$((${BACKUP_KEEP} + 1)) | xargs -r rm -f
+    echo "模組與設定已更新: setup-$STAMP.tar.gz"
+  fi
+else
+  echo "模組與設定沒有變動，沿用上一份"
+fi
 BACKUP
 chmod +x ${dir}/backup.sh
 
