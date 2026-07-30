@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, ModFile, UploadItem } from '@shared/types'
 import { REMOTE } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
-import { ErrorText, Loading, Modal, Waiting } from '../../components/Ui'
+import { completedKey, percentOf, useTransfers } from '../../lib/transfers'
+import { ErrorText, Loading, Modal, TransferRow, Waiting } from '../../components/Ui'
 
 /**
  * 模組分頁。
@@ -67,19 +68,30 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   const [conflict, setConflict] = useState<string[] | null>(null)
   const [dropping, setDropping] = useState(false)
 
-  /** 動過模組但還沒重新啟動。載入器只在啟動時掃一次 mods 資料夾。 */
-  const [dirty, setDirty] = useState(false)
+  /**
+   * 現在跑的那份 Minecraft 有沒有載到最新的模組。
+   *
+   * 這個值來自機器上的時間戳（模組的修改時間 vs 服務的啟動時間），不是
+   * 畫面自己記的旗標——旗標會在切分頁時跟著元件一起消失，使用者切走再
+   * 回來就看不到「該重啟了」的提示，還以為已經生效了。
+   */
+  const [needsRestart, setNeedsRestart] = useState(false)
   const [confirmRestart, setConfirmRestart] = useState<{ players: number | null } | null>(null)
   const [restarting, setRestarting] = useState(false)
 
   const listRef = useRef<HTMLDivElement>(null)
   const conflictAnswer = useRef<((choice: ConflictChoice | null) => void) | null>(null)
 
+  // 進度由主行程保管，切走再回來還在傳的東西依然看得到
+  const transfers = useTransfers(server.name)
+
   // --- 讀取 -----------------------------------------------------------------
 
   const load = useCallback(async () => {
     try {
-      setMods(await call(window.api.mods.list(server.name, server.zone)))
+      const listing = await call(window.api.mods.list(server.name, server.zone))
+      setMods(listing.mods)
+      setNeedsRestart(listing.needsRestart)
       setMessage('')
     } catch (err) {
       setMessage(errorText(err))
@@ -92,6 +104,13 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
     void load()
     listRef.current?.focus({ preventScroll: true })
   }, [load])
+
+  // 傳輸完成就重讀一次。整段上傳都發生在別的分頁上時，這裡是唯一會
+  // 讓清單跟上的機會——當初送出上傳的那個元件早就卸載了。
+  const finished = completedKey(transfers)
+  useEffect(() => {
+    if (finished) void load()
+  }, [finished, load])
 
   const sorted = useMemo(() => {
     const list = [...mods]
@@ -188,7 +207,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
           changing.map((mod) => ({ from: mod.path, to: `${targetDir}/${mod.fileName}` }))
         )
       )
-      setDirty(true)
+      // 狀態由 load() 從機器上的時間戳重新算，這裡不自己記
       await load()
     })
   }
@@ -202,7 +221,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
     await run(t('mods.busy.delete'), async () => {
       await call(window.api.files.delete(server.name, server.zone, targets.map((m) => m.path)))
       setSelected(new Set())
-      setDirty(true)
+      // 狀態由 load() 從機器上的時間戳重新算，這裡不自己記
       await load()
     })
   }
@@ -236,7 +255,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
         replace: p.replace
       }))
       await call(window.api.files.upload(server.name, server.zone, items))
-      setDirty(true)
+      // 狀態由 load() 從機器上的時間戳重新算，這裡不自己記
       await load()
       setSelected(new Set(items.map((i) => i.remotePath)))
       // 有東西被濾掉時仍然要講，不然使用者會以為全部都上傳了
@@ -274,7 +293,9 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
     setMessage('')
     try {
       await call(window.api.minecraft.restart(server.name, server.zone))
-      setDirty(false)
+      // 重新問一次而不是自己假設已經乾淨了——判斷「載到最新模組了沒」
+      // 的依據在機器上，這裡憑空清掉旗標就等於又回到會說謊的做法
+      await load()
     } catch (err) {
       setMessage(errorText(err))
     } finally {
@@ -446,8 +467,9 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
         </button>
       </div>
 
-      {/* 改完不重啟等於沒改。還沒動過時只是一句說明，動過之後才變成待辦。 */}
-      {dirty ? (
+      {/* 改完不重啟等於沒改。還沒動過時只是一句說明，動過之後才變成待辦。
+          needsRestart 是機器上算出來的，所以切走再回來它還在。 */}
+      {needsRestart ? (
         <div className="notice">
           <p className="small">{t('mods.needRestart')}</p>
           <div className="actions">
@@ -569,7 +591,16 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
           </span>
         )}
         <div className="grow" />
-        {busyNow && (
+        {transfers.map((job) => (
+          <TransferRow
+            key={job.id}
+            label={t(job.kind === 'upload' ? 'mods.busy.upload' : 'mods.busy.download')}
+            name={job.label}
+            percent={percentOf(job)}
+            failed={job.state === 'failed'}
+          />
+        ))}
+        {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}
           </span>

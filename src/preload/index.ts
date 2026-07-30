@@ -10,14 +10,15 @@ import type {
   MachineType,
   McVersion,
   MinecraftServer,
-  ModFile,
   ModLoader,
+  ModsListing,
   PlayerLists,
   Preferences,
   PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties,
+  Transfer,
   TransferItem,
   UpdateState,
   UploadItem
@@ -101,10 +102,26 @@ const api = {
    * 一個要在系統對話框裡只顯示 .jar。
    */
   mods: {
-    list: (name: string, zone: string): Promise<Result<ModFile[]>> =>
+    list: (name: string, zone: string): Promise<Result<ModsListing>> =>
       invoke('mods:list', name, zone),
     /** 開檔案選擇視窗（只顯示 .jar），回傳選到的本機路徑，還沒上傳 */
     pick: (): Promise<Result<string[]>> => invoke('mods:pick')
+  },
+
+  /**
+   * 上傳與下載的進度。
+   *
+   * 狀態由主行程保管，畫面只是訂閱者——所以切到別的分頁再回來，
+   * 還在跑的傳輸依然看得到，不會像以前那樣憑空消失。
+   */
+  transfer: {
+    /** 現在有哪些正在傳。畫面重新掛載時用這個補回進度。 */
+    list: (): Promise<Result<Transfer[]>> => invoke('transfer:list'),
+    onChange: (handler: (list: Transfer[]) => void): (() => void) => {
+      const listener = (_e: unknown, list: Transfer[]): void => handler(list)
+      ipcRenderer.on('transfer:changed', listener)
+      return () => ipcRenderer.removeListener('transfer:changed', listener)
+    }
   },
 
   /** 伺服器的建立與電源控制 */

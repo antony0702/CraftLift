@@ -10,14 +10,15 @@ import type {
   MachineType,
   McVersion,
   MinecraftServer,
-  ModFile,
   ModLoader,
+  ModsListing,
   PlayerLists,
   Preferences,
   PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties,
+  Transfer,
   TransferItem,
   UpdateState,
   UploadItem
@@ -58,6 +59,7 @@ import {
   setPreferences
 } from './preferences'
 import { checkForUpdate, downloadUpdate, getUpdateState, installUpdate } from './updater'
+import { listTransfers, onTransfersChanged, startTransfer } from './transfers'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -136,6 +138,46 @@ function handle<Args extends unknown[], T>(
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+}
+
+/** 遠端路徑的最後一段，拿來當進度條上的說明 */
+function baseName(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path
+}
+
+/**
+ * 跑一批下載，並登記成一筆看得到進度的傳輸。
+ *
+ * 總量要等 downloadPath 問過遠端才知道，所以是一邊跑一邊補上去的——
+ * 第一個檔案還在算大小的那一兩秒，畫面顯示的是不確定進度。
+ */
+async function runDownload(
+  name: string,
+  zone: string,
+  jobs: Array<{ remotePath: string; localPath: string }>
+): Promise<void> {
+  const transfer = startTransfer({
+    kind: 'download',
+    server: name,
+    label: baseName(jobs[0]?.remotePath ?? ''),
+    totalBytes: 0
+  })
+  let total = 0
+  try {
+    await withConnection(name, zone, async (conn) => {
+      for (const job of jobs) {
+        transfer.describe(baseName(job.remotePath))
+        await ops.downloadPath(conn, job.remotePath, job.localPath, transfer.advance, (bytes) => {
+          total += bytes
+          transfer.setTotal(total)
+        })
+      }
+    })
+    transfer.done()
+  } catch (err) {
+    transfer.fail(err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 /** 每台伺服器目前的日誌串流停止函式 */
@@ -445,11 +487,39 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle(
     'files:upload',
     async (name: string, zone: string, items: UploadItem[]): Promise<void> => {
-      await withConnection(name, zone, async (conn) => {
-        for (const item of items) {
-          await ops.uploadPath(conn, item.localPath, item.remotePath, item.replace)
+      // 總量先算出來才畫得出進度條。這是本機的 stat，很快。
+      let totalBytes = 0
+      for (const item of items) {
+        try {
+          totalBytes += await ops.localSize(item.localPath)
+        } catch {
+          // 算不出來就算了，畫面會顯示成不確定進度
         }
+      }
+      const transfer = startTransfer({
+        kind: 'upload',
+        server: name,
+        label: baseName(items[0]?.remotePath ?? ''),
+        totalBytes
       })
+      try {
+        await withConnection(name, zone, async (conn) => {
+          for (const item of items) {
+            transfer.describe(baseName(item.remotePath))
+            await ops.uploadPath(
+              conn,
+              item.localPath,
+              item.remotePath,
+              item.replace,
+              transfer.advance
+            )
+          }
+        })
+        transfer.done()
+      } catch (err) {
+        transfer.fail(err instanceof Error ? err.message : String(err))
+        throw err
+      }
     }
   )
 
@@ -474,7 +544,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
           })
           if (picked.canceled || !picked.filePath) return null
           const target = picked.filePath
-          await withConnection(name, zone, (conn) => ops.downloadPath(conn, single, target))
+          await runDownload(name, zone, [{ remotePath: single, localPath: target }])
           return target
         }
       }
@@ -485,12 +555,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       if (picked.canceled || !picked.filePaths[0]) return null
       const dir = picked.filePaths[0]
 
-      await withConnection(name, zone, async (conn) => {
-        for (const remotePath of remotePaths) {
-          const target = await freeLocalPath(dir, remotePath.split('/').pop() as string)
-          await ops.downloadPath(conn, remotePath, target)
-        }
-      })
+      const jobs: Array<{ remotePath: string; localPath: string }> = []
+      for (const remotePath of remotePaths) {
+        jobs.push({
+          remotePath,
+          localPath: await freeLocalPath(dir, remotePath.split('/').pop() as string)
+        })
+      }
+      await runDownload(name, zone, jobs)
       return dir
     }
   )
@@ -500,6 +572,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     shell.showItemInFolder(localPath)
   })
 
+  // --- 傳輸進度 -------------------------------------------------------------
+  // 狀態放在主行程，所以畫面切走再回來仍然看得到還在跑的那幾筆
+  handle('transfer:list', async (): Promise<Transfer[]> => listTransfers())
+  onTransfersChanged((list) => getWindow()?.webContents.send('transfer:changed', list))
+
   // --- 備份 -----------------------------------------------------------------
   // --- 模組 -----------------------------------------------------------------
   /**
@@ -507,7 +584,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
    * .disabled）全部走 files:* 那幾條已經驗過的路——它們本來就是同一件事，
    * 而且那邊已經有路徑逃逸防護。
    */
-  handle('mods:list', async (name: string, zone: string): Promise<ModFile[]> =>
+  handle('mods:list', async (name: string, zone: string): Promise<ModsListing> =>
     withConnection(name, zone, (conn) => ops.listMods(conn))
   )
 

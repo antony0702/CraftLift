@@ -5,6 +5,17 @@ import { BACKUP_KEEP } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
 import { ErrorText, Field, Loading } from '../../components/Ui'
 
+/**
+ * 備份分成兩類，靠檔名前綴分辨。
+ *
+ * 後端本來就是分開打包的：世界每隔幾小時一份，模組與設定只有真的變動過
+ * 才會產生新的一份。前端照這條線分開列，使用者才不用自己讀檔名。
+ */
+const SECTIONS = [
+  { id: 'world', prefix: 'world-' },
+  { id: 'setup', prefix: 'setup-' }
+] as const
+
 export default function BackupsTab({ server }: { server: MinecraftServer }): React.JSX.Element {
   const { t } = useTranslation()
   const [backups, setBackups] = useState<Backup[]>([])
@@ -101,26 +112,42 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
 
       <ErrorText>{message}</ErrorText>
 
-      {backups.length === 0 ? (
-        <p className="muted small">{t('backups.empty')}</p>
-      ) : (
-        <table className="table">
-          <tbody>
-            {backups.map((backup) => (
-              <tr key={backup.path}>
-                <td>{backup.fileName}</td>
-                <td className="muted small nowrap">{formatSize(backup.size)}</td>
-                <td className="muted small nowrap">{formatTime(backup.modifiedAt)}</td>
-                <td className="nowrap">
-                  <button type="button" className="link-btn" onClick={() => void download(backup)}>
-                    {t('backups.saveToPc')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* 世界與伺服器設定分開列。它們是兩種不同的東西——世界每隔幾小時
+          就有新的一份，設定與模組只有真的改動過才會多一份——混在同一張
+          表格裡，使用者得自己讀檔名去分辨哪個是哪個。 */}
+      {SECTIONS.map((section) => {
+        const rows = backups.filter((b) => b.fileName.startsWith(section.prefix))
+        return (
+          <div className="backup-group" key={section.id}>
+            <h3>{t(`backups.groups.${section.id}.title`)}</h3>
+            <p className="muted small">{t(`backups.groups.${section.id}.desc`)}</p>
+            {rows.length === 0 ? (
+              <p className="muted small">{t('backups.empty')}</p>
+            ) : (
+              <table className="table">
+                <tbody>
+                  {rows.map((backup) => (
+                    <tr key={backup.path}>
+                      <td className="fact">{backup.fileName}</td>
+                      <td className="muted small nowrap">{formatSize(backup.size)}</td>
+                      <td className="muted small nowrap">{formatTime(backup.modifiedAt)}</td>
+                      <td className="nowrap">
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => void download(backup)}
+                        >
+                          {t('backups.saveToPc')}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

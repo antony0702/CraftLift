@@ -230,8 +230,9 @@ export default {
       upload: 'Upload mods…'
     },
     busy: {
-      upload: 'Uploading…',
-      download: 'Downloading…',
+      /* 進度條旁邊的說明，後面會接一條進度條，所以不用刪節號 */
+      upload: 'Uploading',
+      download: 'Downloading',
       delete: 'Deleting…',
       enable: 'Enabling…',
       disable: 'Disabling…',
@@ -303,8 +304,9 @@ export default {
     },
     busy: {
       open: 'Opening…',
-      upload: 'Uploading…',
-      download: 'Downloading…',
+      /* 這兩個後面會接一條進度條，所以不用刪節號 */
+      upload: 'Uploading',
+      download: 'Downloading',
       delete: 'Deleting…',
       rename: 'Renaming…',
       mkdir: 'Creating folder…',
@@ -418,7 +420,17 @@ export default {
     intervalHint:
       'The server backs itself up on this schedule, asking Minecraft to flush data to disk first.',
     empty: '(no backups yet)',
-    saveToPc: 'Save to PC'
+    saveToPc: 'Save to PC',
+    groups: {
+      world: {
+        title: 'World',
+        desc: 'Your save. Backed up automatically on the interval above.'
+      },
+      setup: {
+        title: 'Server setup',
+        desc: 'Mods, server settings, whitelist and operators. A new copy only appears when something actually changed.'
+      }
+    }
   },
   update: {
     title: 'Software update',

@@ -2,12 +2,11 @@ import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { pipeline } from 'node:stream/promises'
 import { REMOTE } from '@shared/constants'
 import type { FileEntry, SFTPWrapper } from 'ssh2'
 import type {
   Backup,
-  ModFile,
+  ModsListing,
   PlayerLists,
   RemoteFile,
   ServerProperties,
@@ -325,19 +324,107 @@ function sftpReaddir(sftp: SFTPWrapper, path: string): Promise<FileEntry[]> {
   })
 }
 
+/** 傳輸過程中回報已完成的位元組。不給也行，就是沒有進度可看。 */
+export type ProgressFn = (bytes: number) => void
+
+/**
+ * 送一個檔案到遠端。
+ *
+ * **一定要等 'close'，不能只等 'finish'。** 這是先前「大檔案有時候傳不上去」
+ * 的原因：'finish' 只代表本地這端把資料全寫進串流了，SFTP 那邊還沒把遠端
+ * 檔案代號關閉、也還沒收到伺服器的確認。用 pipeline() 會在 'finish' 就回傳，
+ * 接著 withSftp 的 finally 立刻 sftp.end() 把通道收掉，還在路上的寫入就這樣
+ * 被丟掉——檔案越大、未確認的寫入越多，所以只有大檔會出事，小檔幾乎都正常。
+ * 這種壞法在畫面上完全看不出來：沒有錯誤，只是檔案沒出現或內容不完整。
+ */
+function uploadFile(
+  sftp: SFTPWrapper,
+  localPath: string,
+  remotePath: string,
+  onProgress?: ProgressFn
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const source = createReadStream(localPath)
+    const sink = sftp.createWriteStream(remotePath)
+    let settled = false
+    const fail = (err: Error): void => {
+      if (settled) return
+      settled = true
+      source.destroy()
+      reject(err)
+    }
+    source.on('error', fail)
+    sink.on('error', fail)
+    if (onProgress) source.on('data', (chunk: Buffer | string) => onProgress(chunk.length))
+    sink.on('close', () => {
+      if (settled) return
+      settled = true
+      resolve()
+    })
+    source.pipe(sink)
+  })
+}
+
+/** 同上，反方向。本機這端一樣等 'close' 才算寫完。 */
+function downloadFile(
+  sftp: SFTPWrapper,
+  remotePath: string,
+  localPath: string,
+  onProgress?: ProgressFn
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const source = sftp.createReadStream(remotePath)
+    const sink = createWriteStream(localPath)
+    let settled = false
+    const fail = (err: Error): void => {
+      if (settled) return
+      settled = true
+      source.destroy()
+      reject(err)
+    }
+    source.on('error', fail)
+    sink.on('error', fail)
+    if (onProgress) source.on('data', (chunk: Buffer | string) => onProgress(chunk.length))
+    sink.on('close', () => {
+      if (settled) return
+      settled = true
+      resolve()
+    })
+    source.pipe(sink)
+  })
+}
+
 /** 把一整棵本機資料夾樹送進暫存區 */
-async function uploadTree(sftp: SFTPWrapper, localDir: string, remoteDir: string): Promise<void> {
+async function uploadTree(
+  sftp: SFTPWrapper,
+  localDir: string,
+  remoteDir: string,
+  onProgress?: ProgressFn
+): Promise<void> {
   await sftpMkdir(sftp, remoteDir)
   for (const entry of await readdir(localDir, { withFileTypes: true })) {
     const local = join(localDir, entry.name)
     const remote = `${remoteDir}/${entry.name}`
     if (entry.isDirectory()) {
-      await uploadTree(sftp, local, remote)
+      await uploadTree(sftp, local, remote, onProgress)
     } else if (entry.isFile()) {
-      await pipeline(createReadStream(local), sftp.createWriteStream(remote))
+      await uploadFile(sftp, local, remote, onProgress)
     }
     // 捷徑與其他特殊檔案跳過——它們在遠端沒有意義
   }
+}
+
+/** 本機這一份東西總共幾個位元組。資料夾要走進去加總。 */
+export async function localSize(path: string): Promise<number> {
+  const info = await stat(path)
+  if (!info.isDirectory()) return info.size
+  let total = 0
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory() || entry.isFile()) {
+      total += await localSize(join(path, entry.name))
+    }
+  }
+  return total
 }
 
 /**
@@ -349,7 +436,8 @@ export async function uploadPath(
   conn: ServerConnection,
   localPath: string,
   remotePath: string,
-  replace = false
+  replace = false,
+  onProgress?: ProgressFn
 ): Promise<void> {
   assertInServerDir(remotePath)
   const staging = stagingPath()
@@ -358,9 +446,9 @@ export async function uploadPath(
   try {
     await conn.withSftp(async (sftp) => {
       if (info.isDirectory()) {
-        await uploadTree(sftp, localPath, staging)
+        await uploadTree(sftp, localPath, staging, onProgress)
       } else {
-        await pipeline(createReadStream(localPath), sftp.createWriteStream(staging))
+        await uploadFile(sftp, localPath, staging, onProgress)
       }
     })
 
@@ -368,9 +456,20 @@ export async function uploadPath(
     const result = await conn.exec(
       `${clear}sudo chown -R minecraft:minecraft ${sq(staging)} && ` +
         `sudo chmod -R u=rwX,go=rX ${sq(staging)} && ` +
-        `sudo cp -a -- ${sq(staging)} ${sq(remotePath)}`
+        `sudo cp -a -- ${sq(staging)} ${sq(remotePath)} && ` +
+        // 搬完之後把實際大小回報一次。傳輸中途被截掉是不會有錯誤訊息的，
+        // 沒有這一步的話畫面會顯示上傳成功，而遠端那個檔案是壞的。
+        `du -sb ${sq(remotePath)} | cut -f1`
     )
     if (result.code !== 0) throw new Error(result.stderr.trim() || '上傳失敗')
+
+    const uploaded = Number(result.stdout.trim().split('\n').pop())
+    const expected = await localSize(localPath)
+    if (Number.isFinite(uploaded) && uploaded !== expected) {
+      throw new Error(
+        `上傳沒有完整送達：預期 ${expected} 位元組，實際 ${uploaded}。請重試一次。`
+      )
+    }
   } finally {
     // 半路失敗也要清，不然 /tmp 會慢慢被沒人認領的半成品塞滿
     await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
@@ -378,7 +477,12 @@ export async function uploadPath(
 }
 
 /** 把暫存區的一棵樹抓回本機 */
-async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: string): Promise<void> {
+async function downloadTree(
+  sftp: SFTPWrapper,
+  remoteDir: string,
+  localDir: string,
+  onProgress?: ProgressFn
+): Promise<void> {
   await mkdir(localDir, { recursive: true })
   for (const entry of await sftpReaddir(sftp, remoteDir)) {
     const remote = `${remoteDir}/${entry.filename}`
@@ -386,9 +490,9 @@ async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: stri
     // SFTP 只給 POSIX 的 mode 位元，沒有現成的 isDirectory()。
     // 0o170000 是檔案類型那四個位元的遮罩，0o040000 就是「資料夾」。
     if ((entry.attrs.mode & 0o170000) === 0o040000) {
-      await downloadTree(sftp, remote, local)
+      await downloadTree(sftp, remote, local, onProgress)
     } else {
-      await pipeline(sftp.createReadStream(remote), createWriteStream(local))
+      await downloadFile(sftp, remote, local, onProgress)
     }
   }
 }
@@ -403,7 +507,10 @@ async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: stri
 export async function downloadPath(
   conn: ServerConnection,
   remotePath: string,
-  localPath: string
+  localPath: string,
+  onProgress?: ProgressFn,
+  /** 總位元組。呼叫端想先知道要拉多少時傳進來收。 */
+  onTotal?: (bytes: number) => void
 ): Promise<void> {
   assertInServerDir(remotePath)
   const staging = stagingPath()
@@ -413,15 +520,21 @@ export async function downloadPath(
       `sudo cp -a -- ${sq(remotePath)} ${sq(staging)} && ` +
         `sudo chown -R $(id -u):$(id -g) ${sq(staging)} && ` +
         `sudo chmod -R u+rwX ${sq(staging)} && ` +
+        // 大小跟「是不是資料夾」在同一趟問完，不多花一次往返
+        `du -sb ${sq(staging)} | cut -f1 && ` +
         `if test -d ${sq(staging)}; then echo DIR; else echo FILE; fi`
     )
     if (prep.code !== 0) throw new Error(prep.stderr.trim() || '準備下載失敗')
 
+    const lines = prep.stdout.trim().split('\n')
+    const total = Number(lines[lines.length - 2])
+    if (onTotal && Number.isFinite(total)) onTotal(total)
+
     await conn.withSftp(async (sftp) => {
       if (prep.stdout.includes('DIR')) {
-        await downloadTree(sftp, staging, localPath)
+        await downloadTree(sftp, staging, localPath, onProgress)
       } else {
-        await pipeline(sftp.createReadStream(staging), createWriteStream(localPath))
+        await downloadFile(sftp, staging, localPath, onProgress)
       }
     })
   } finally {
@@ -447,13 +560,28 @@ export async function downloadPath(
  * 資料夾不存在時 find 什麼都不吐而不是丟例外，剛好就是我們要的：
  * 一台還沒放過模組的伺服器回傳空清單，不是錯誤。
  */
-export async function listMods(conn: ServerConnection): Promise<ModFile[]> {
+export async function listMods(conn: ServerConnection): Promise<ModsListing> {
+  // 順便問 Minecraft 是什麼時候啟動的。這個數字決定「改完還沒重啟」——
+  // 讓機器自己算，比在畫面上記一個旗標可靠：切分頁、關掉 app、從別的
+  // 分頁重啟伺服器，這些情況下旗標都會說謊，而時間戳不會。
   const result = await conn.exec(
-    `sudo find ${sq(REMOTE.modsDir)} ${sq(REMOTE.inactiveModsDir)} ` +
+    `date -d "$(systemctl show ${REMOTE.serviceName} --value -p ActiveEnterTimestamp 2>/dev/null)" +%s 2>/dev/null || echo 0; ` +
+      `echo '---'; ` +
+      `sudo find ${sq(REMOTE.modsDir)} ${sq(REMOTE.inactiveModsDir)} ` +
       `-maxdepth 1 -mindepth 1 -type f -printf '%h\\t%s\\t%T@\\t%f\\0' 2>/dev/null || true`
   )
 
-  return result.stdout
+  const [head, ...rest] = result.stdout.split('---')
+  // 服務沒在跑（或問不到）時是 0。這時候不該說「需要重新啟動」——
+  // 它根本沒在跑，該做的是啟動而不是重啟，那是主控台分頁的事。
+  const startedAt = Number(head.trim()) * 1000
+
+  const mods = rest
+    .join('---')
+    // echo 在分隔線後面留下的那個換行會黏在第一筆的資料夾欄位上，
+    // 讓路徑變成 "\n/opt/minecraft/mods/..."，連帶把啟用狀態也判錯
+    // （比對不到 inactive，於是每個模組看起來都是啟用中）。
+    .replace(/^\r?\n/, '')
     .split('\0')
     .filter(Boolean)
     .map((entry) => {
@@ -473,6 +601,16 @@ export async function listMods(conn: ServerConnection): Promise<ModFile[]> {
       modifiedAt: Math.floor(f.mtime * 1000)
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
+
+  // 有任何一個模組比服務的啟動時間新，就代表現在跑的那份 Minecraft
+  // 沒有載到它。啟用與停用都是搬檔案，搬過去的那份 mtime 會更新，
+  // 所以兩個方向都抓得到。
+  const newest = mods.reduce((max, m) => Math.max(max, m.modifiedAt), 0)
+  return {
+    mods,
+    needsRestart: startedAt > 0 && newest > startedAt,
+    running: startedAt > 0
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -217,8 +217,9 @@ export default {
       upload: '上傳模組……'
     },
     busy: {
-      upload: '正在上傳……',
-      download: '正在下載……',
+      /* 進度條旁邊的說明，後面會接一條進度條，所以不用刪節號 */
+      upload: '正在上傳',
+      download: '正在下載',
       delete: '正在刪除……',
       enable: '正在啟用……',
       disable: '正在停用……',
@@ -285,8 +286,9 @@ export default {
     },
     busy: {
       open: '正在開啟……',
-      upload: '正在上傳……',
-      download: '正在下載……',
+      /* 這兩個後面會接一條進度條，所以不用刪節號 */
+      upload: '正在上傳',
+      download: '正在下載',
       delete: '正在刪除……',
       rename: '正在重新命名……',
       mkdir: '正在建立資料夾……',
@@ -387,7 +389,17 @@ export default {
     interval: '自動備份間隔（小時）',
     intervalHint: '伺服器會依照這個間隔自動備份。備份前會先請 Minecraft 把資料寫入磁碟。',
     empty: '（還沒有任何備份）',
-    saveToPc: '存到電腦'
+    saveToPc: '存到電腦',
+    groups: {
+      world: {
+        title: '世界',
+        desc: '你的存檔。依照上面的間隔自動備份。'
+      },
+      setup: {
+        title: '伺服器設定',
+        desc: '模組、伺服器設定、白名單與管理員名單。只有真的改動過才會多一份。'
+      }
+    }
   },
   update: {
     title: '軟體更新',

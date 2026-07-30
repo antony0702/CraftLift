@@ -216,6 +216,40 @@ export interface ModFile {
   modifiedAt: number
 }
 
+/**
+ * 一趟進行中（或剛結束）的上傳／下載。
+ *
+ * 狀態由主行程保管而不是畫面——傳大檔要好幾分鐘，使用者這段期間會切分頁，
+ * 進度存在元件裡的話切走一次就沒了，回來會以為傳輸消失了。
+ */
+export interface Transfer {
+  id: string
+  kind: 'upload' | 'download'
+  /** 哪一台伺服器的。畫面只顯示自己這台的。 */
+  server: string
+  /** 給人看的說明，通常是檔名 */
+  label: string
+  /** 總位元組。0 代表算不出來，畫面要顯示成不確定進度而不是假裝 0%。 */
+  totalBytes: number
+  doneBytes: number
+  state: 'running' | 'done' | 'failed'
+  error?: string
+}
+
+/**
+ * 模組清單，外加「現在跑的這份 Minecraft 有沒有載到最新的模組」。
+ *
+ * needsRestart 由機器上的時間戳算出來（模組的修改時間 vs 服務的啟動時間），
+ * 不是畫面自己記的旗標。旗標會在切分頁、關掉 app、或從主控台分頁重啟之後
+ * 說謊；時間戳不會。
+ */
+export interface ModsListing {
+  mods: ModFile[]
+  needsRestart: boolean
+  /** Minecraft 服務正在跑。沒在跑時不該叫使用者「重新啟動」。 */
+  running: boolean
+}
+
 /** VM 上的一份備份 */
 export interface Backup {
   fileName: string
