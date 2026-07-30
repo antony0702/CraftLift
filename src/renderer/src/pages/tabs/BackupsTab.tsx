@@ -26,8 +26,6 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
   const [backups, setBackups] = useState<Backup[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  /** 正在打包哪一種。打包中的那一區不給下載，避免拿到寫到一半的檔案。 */
-  const [creating, setCreating] = useState<Kind | null>(null)
   const [message, setMessage] = useState('')
   const [interval, setIntervalHours] = useState(6)
 
@@ -59,16 +57,20 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
     if (finished) void load()
   }, [finished, load])
 
+  /**
+   * 立刻備份。
+   *
+   * 「正在打包」的狀態刻意不放在這裡——它由主行程的登記處保管，這個元件
+   * 只是訂閱者。放在元件裡的話，使用者切個分頁再回來就看不到打包中的
+   * 提示，而下載按鈕會跑出來，於是下載到一份還在寫的壓縮檔。
+   */
   const createNow = async (kind: Kind): Promise<void> => {
-    setCreating(kind)
     setMessage('')
     try {
       await call(window.api.backup.create(server.name, server.zone, kind))
       await load()
     } catch (err) {
       setMessage(errorText(err))
-    } finally {
-      setCreating(null)
     }
   }
 
@@ -94,9 +96,30 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
 
   if (loading) return <Loading />
 
-  /** 這一份備份正在被拉回本機嗎 */
+  /**
+   * 這一份備份正在被拉回本機嗎。
+   *
+   * 只認「進行中」與「已暫停」。登記處會把結束的紀錄多留幾秒，好讓剛切
+   * 回來的畫面看得到結果——狀態列那種地方需要這個，但表格裡不行：這一格
+   * 的職責是那顆下載按鈕，取消之後按鈕必須立刻回來，不能等紀錄過期。
+   */
   const transferOf = (backup: Backup): (typeof transfers)[number] | undefined =>
-    transfers.find((job) => job.kind === 'download' && job.label === backup.fileName)
+    transfers.find(
+      (job) =>
+        job.kind === 'download' &&
+        job.label === backup.fileName &&
+        (job.state === 'running' || job.state === 'paused')
+    )
+
+  /** 這一區正在打包嗎。答案在主行程，所以切分頁回來依然正確。 */
+  const packingOf = (kind: Kind): boolean =>
+    transfers.some(
+      (job) =>
+        job.kind === 'backup' &&
+        job.state === 'running' &&
+        (job.label === kind || job.label === 'all')
+    )
+  const anyPacking = transfers.some((job) => job.kind === 'backup' && job.state === 'running')
 
   return (
     <div className="backups">
@@ -130,7 +153,7 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
 
       {SECTIONS.map((section) => {
         const rows = backups.filter((b) => b.fileName.startsWith(section.prefix))
-        const packing = creating === section.id
+        const packing = packingOf(section.id)
         return (
           <div className="backup-group" key={section.id}>
             <div className="toolbar">
@@ -139,7 +162,7 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
               <button
                 type="button"
                 className="primary"
-                disabled={creating !== null}
+                disabled={anyPacking}
                 onClick={() => void createNow(section.id)}
               >
                 {t(`backups.groups.${section.id}.createNow`)}

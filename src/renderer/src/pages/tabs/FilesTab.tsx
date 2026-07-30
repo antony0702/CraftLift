@@ -823,7 +823,7 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
         <div className="grow" />
         {/* 傳輸有自己的進度條；其餘操作（刪除、改名、貼上）沒有可量的進度，
             繼續用逐格等待指示 */}
-        <Transfers transfers={transfers} />
+        <Transfers transfers={transfers.filter((job) => job.kind !== 'backup')} />
         {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}

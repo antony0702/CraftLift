@@ -224,10 +224,18 @@ export interface ModFile {
  */
 export interface Transfer {
   id: string
-  kind: 'upload' | 'download'
+  /**
+   * backup 是「伺服器正在打包一份備份」，不是傳輸，但它跟上傳下載一樣
+   * 會跑好幾分鐘、而且切分頁之後依然在跑，所以共用同一套登記機制。
+   * 不要為這種長時間操作再發明第三種做法。
+   */
+  kind: 'upload' | 'download' | 'backup'
   /** 哪一台伺服器的。畫面只顯示自己這台的。 */
   server: string
-  /** 給人看的說明，通常是檔名 */
+  /**
+   * 給人看的說明，通常是檔名。
+   * kind 是 backup 時放的是 'world' 或 'setup'，畫面靠它分辨哪一區在打包。
+   */
   label: string
   /** 總位元組。0 代表算不出來，畫面要顯示成不確定進度而不是假裝 0%。 */
   totalBytes: number

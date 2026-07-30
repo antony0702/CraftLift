@@ -602,7 +602,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
           </span>
         )}
         <div className="grow" />
-        <Transfers transfers={transfers} />
+        <Transfers transfers={transfers.filter((job) => job.kind !== 'backup')} />
         {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}

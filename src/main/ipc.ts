@@ -632,10 +632,27 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>
     withConnection(name, zone, ops.listBackups)
   )
+  /**
+   * 立刻備份。
+   *
+   * 登記成一筆 backup，理由跟上傳下載一樣：打包一個世界要好幾分鐘，而
+   * 使用者這段期間會切分頁。狀態若只活在備份分頁的元件裡，切走一次就
+   * 消失，回來會看到一份還在寫的壓縮檔配上一顆可以按的下載按鈕——
+   * 那會下載到不完整的檔案。
+   */
   handle(
     'backup:create',
-    async (name: string, zone: string, kind: 'world' | 'setup' | 'all' = 'all'): Promise<string> =>
-      withConnection(name, zone, (conn) => ops.createBackup(conn, kind))
+    async (name: string, zone: string, kind: 'world' | 'setup' | 'all' = 'all'): Promise<string> => {
+      const job = startTransfer({ kind: 'backup', server: name, label: kind, totalBytes: 0 })
+      try {
+        const out = await withConnection(name, zone, (conn) => ops.createBackup(conn, kind))
+        job.done()
+        return out
+      } catch (err) {
+        job.fail(err instanceof Error ? err.message : String(err))
+        throw err
+      }
+    }
   )
   handle('backup:setInterval', async (name: string, zone: string, hours: number): Promise<void> => {
     await setPreferences({ backupIntervalHours: hours })
