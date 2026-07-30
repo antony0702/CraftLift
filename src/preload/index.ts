@@ -6,9 +6,12 @@ import type {
   CreateServerOptions,
   FeedbackInput,
   GcloudStatus,
+  LoaderVersion,
   MachineType,
   McVersion,
   MinecraftServer,
+  ModFile,
+  ModLoader,
   PlayerLists,
   Preferences,
   PriceEstimate,
@@ -77,6 +80,31 @@ const api = {
     versions: (includeSnapshots = false): Promise<Result<McVersion[]>> =>
       invoke('mc:versions', includeSnapshots),
     latest: (): Promise<Result<string>> => invoke('mc:latest')
+  },
+
+  /** 模組載入器（來自各載入器官方的公開版本資料） */
+  loader: {
+    /** 這個載入器搭配這個 Minecraft 版本可以用的版本，新的排前面 */
+    versions: (loader: ModLoader, mcVersion: string): Promise<Result<LoaderVersion[]>> =>
+      invoke('loader:versions', loader, mcVersion)
+  },
+
+  /**
+   * 模組管理。
+   *
+   * 這裡只有兩個方法，因為模組分頁做的事其實就是檔案總管做的事：上傳、
+   * 刪除、下載、改名，全部走 files.* 那一套已經驗過的路徑（含路徑逃逸
+   * 防護）。「停用」在模組生態裡本來就是把副檔名改成 .disabled，所以它
+   * 也是一次 files.rename，不需要自己的通道。
+   *
+   * 剩下這兩個是檔案總管給不了的：一個要判斷啟用狀態並拆出好看的名稱，
+   * 一個要在系統對話框裡只顯示 .jar。
+   */
+  mods: {
+    list: (name: string, zone: string): Promise<Result<ModFile[]>> =>
+      invoke('mods:list', name, zone),
+    /** 開檔案選擇視窗（只顯示 .jar），回傳選到的本機路徑，還沒上傳 */
+    pick: (): Promise<Result<string[]>> => invoke('mods:pick')
   },
 
   /** 伺服器的建立與電源控制 */

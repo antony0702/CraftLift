@@ -6,9 +6,12 @@ import type {
   BillingAccount,
   CreateServerOptions,
   FeedbackInput,
+  LoaderVersion,
   MachineType,
   McVersion,
   MinecraftServer,
+  ModFile,
+  ModLoader,
   PlayerLists,
   Preferences,
   PriceEstimate,
@@ -42,6 +45,8 @@ import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
 import { estimatePrice } from './gcloud/pricing'
 import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
+import { listLoaderVersions, resolveLoaderInstall } from './loaders'
+import type { LoaderInstall } from './loaders'
 import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
 import type { ServerConnection } from './server/ssh'
@@ -217,21 +222,40 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   )
   handle('mc:latest', latestRelease)
 
+  // --- 模組載入器版本 -------------------------------------------------------
+  handle(
+    'loader:versions',
+    async (loader: ModLoader, mcVersion: string): Promise<LoaderVersion[]> =>
+      listLoaderVersions(loader, mcVersion)
+  )
+
   // --- 伺服器（GCP 層）------------------------------------------------------
   handle('server:list', async (): Promise<MinecraftServer[]> => listServers(await requireProject()))
 
   handle('server:create', async (opts: CreateServerOptions): Promise<MinecraftServer> => {
     const projectId = await requireProject()
+    // Fabric 用不到 Mojang 的 server.jar（它自己會抓），但這一趟仍然要跑——
+    // 這個 Minecraft 版本需要哪個 Java 版本只有 Mojang 說得準
     const jar = await getServerJarInfo(opts.mcVersion)
     const prefs = await getPreferences()
+
+    // 版本在這裡才定案：畫面送空字串代表「交給 CraftLift 挑」。
+    // 定案的結果要寫進機器的 metadata，否則之後查不出裝的是哪一版。
+    let loader: LoaderInstall | null = null
+    if (opts.flavor !== 'vanilla') {
+      loader = await resolveLoaderInstall(opts.flavor, opts.mcVersion, opts.loaderVersion)
+    }
+
     const script = buildStartupScript({
       serverJarUrl: jar.url,
       javaMajorVersion: jar.javaMajorVersion,
       // JVM 記憶體依實際選到的機器規格換算，不再綁定固定方案
       jvmHeap: jvmHeapFor(opts.memoryGb),
-      backupIntervalHours: prefs.backupIntervalHours
+      backupIntervalHours: prefs.backupIntervalHours,
+      flavor: opts.flavor,
+      loader: loader ? { kind: loader.kind, url: loader.url } : null
     })
-    return createServer(projectId, opts, script)
+    return createServer(projectId, opts, script, loader?.version ?? null)
   })
 
   // --- 機型與價格 -----------------------------------------------------------
@@ -444,6 +468,27 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   })
 
   // --- 備份 -----------------------------------------------------------------
+  // --- 模組 -----------------------------------------------------------------
+  /**
+   * 這裡只有兩個口。模組的上傳、刪除、下載，以及「停用」（把副檔名改成
+   * .disabled）全部走 files:* 那幾條已經驗過的路——它們本來就是同一件事，
+   * 而且那邊已經有路徑逃逸防護。
+   */
+  handle('mods:list', async (name: string, zone: string): Promise<ModFile[]> =>
+    withConnection(name, zone, (conn) => ops.listMods(conn))
+  )
+
+  /** 只顯示 .jar 的檔案選擇視窗。選檔與上傳分開，畫面才能夾在中間問撞名。 */
+  handle('mods:pick', async (): Promise<string[]> => {
+    const window = getWindow()
+    if (!window) return []
+    const picked = await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Minecraft mod', extensions: ['jar'] }]
+    })
+    return picked.canceled ? [] : picked.filePaths
+  })
+
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>
     withConnection(name, zone, ops.listBackups)
   )

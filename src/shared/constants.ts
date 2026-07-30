@@ -9,13 +9,17 @@ export const META = {
   displayName: 'craftlift-display-name',
   mcVersion: 'craftlift-mc-version',
   tier: 'craftlift-tier',
-  createdAt: 'craftlift-created-at'
+  createdAt: 'craftlift-created-at',
+  /** 主程式種類。v1.1.0 之前建立的機器沒有這個鍵，讀不到就是 vanilla。 */
+  flavor: 'craftlift-flavor',
+  loaderVersion: 'craftlift-loader-version'
 } as const
 
 /** Minecraft 伺服器在 VM 上的安裝位置 */
 export const REMOTE = {
   serverDir: '/opt/minecraft',
   backupDir: '/opt/minecraft/backups',
+  modsDir: '/opt/minecraft/mods',
   logFile: '/opt/minecraft/logs/latest.log',
   serviceName: 'minecraft',
   rconPort: 25575,
@@ -61,6 +65,53 @@ export function jvmHeapFor(memoryGb: number): string {
   const heap = Math.max(1, Math.floor(memoryGb * 0.75))
   return `${heap}G`
 }
+
+/**
+ * 模組載入器。
+ *
+ * 三個都只是「換掉 server.jar」而已，對 CraftLift 來說差別在於安裝方式與
+ * 支援的 Minecraft 版本範圍。玩家端也必須裝同一個載入器與同一份模組——
+ * 這是使用者最容易忽略的一件事，介面上要講。
+ *
+ * 插件伺服器（Paper）不在這張清單裡：它吃的是外掛不是模組，玩家端什麼都
+ * 不用裝，概念不同，之後另外處理。
+ */
+export interface Loader {
+  id: 'fabric' | 'neoforge' | 'forge'
+  /** 這個載入器支援的最舊 Minecraft 版本 */
+  minMcVersion: string
+}
+
+export const LOADERS: Loader[] = [
+  { id: 'fabric', minMcVersion: '1.14' },
+  { id: 'neoforge', minMcVersion: '1.20.1' },
+  { id: 'forge', minMcVersion: '1.7.10' }
+]
+
+/**
+ * 比較兩個 Minecraft 版本號。
+ *
+ * 只處理 1.21.4 這種正式版編號——建立畫面的版本清單本來就沒有快照版。
+ * 段數不同時（1.21 與 1.21.4）缺的段當 0，所以 1.21 < 1.21.4。
+ */
+export function mcVersionAtLeast(version: string, minimum: string): boolean {
+  const parse = (v: string): number[] => v.split('.').map((part) => Number(part) || 0)
+  const a = parse(version)
+  const b = parse(minimum)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0)
+    if (diff !== 0) return diff > 0
+  }
+  return true
+}
+
+/**
+ * 低於這個記憶體就提醒使用者模組會不夠跑。
+ *
+ * 不是硬性下限——模組數量差很多，二十個模組跟三百個模組不是同一回事。
+ * 但 4GB 配上一份中型模組包幾乎一定會卡，先講比事後才發現好。
+ */
+export const MODDED_RECOMMENDED_RAM_GB = 8
 
 /** 可選區域。預設彰化，台灣玩家延遲最低。 */
 export interface Zone {

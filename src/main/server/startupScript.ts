@@ -1,3 +1,4 @@
+import type { ServerFlavor } from '@shared/types'
 import { BACKUP_KEEP, REMOTE } from '@shared/constants'
 
 export interface StartupScriptOptions {
@@ -9,6 +10,69 @@ export interface StartupScriptOptions {
   jvmHeap: string
   /** 自動備份間隔（小時） */
   backupIntervalHours: number
+  /** 主程式種類。vanilla 以外都要另外裝載入器。 */
+  flavor: ServerFlavor
+  /**
+   * 載入器的安裝來源。flavor 是 vanilla 時為 null。
+   *   serverJar —— 下載下來就是可以直接跑的 jar（Fabric）
+   *   installer —— 下載的是安裝程式，要在機器上跑 --installServer
+   */
+  loader: { kind: 'serverJar' | 'installer'; url: string } | null
+}
+
+/**
+ * 產生安裝主程式的那一段，以及決定 systemd 要怎麼啟動它。
+ *
+ * 這段跑完之後 shell 變數 $LAUNCH 會是 java 後面要接的參數。
+ *
+ * Forge 與 NeoForge 的安裝程式產生什麼檔案、放在哪裡，各版本並不一致
+ * （1.17 前後是兩種完全不同的佈局），所以這裡不猜路徑，而是裝完在機器上
+ * 現找——找得到 unix_args.txt 就用新版的啟動方式，找不到就退回舊版那個
+ * 可以直接執行的 forge-*.jar。在這裡寫死一張對照表，遲早會在某個版本上壞掉。
+ */
+function buildInstallBlock(opts: StartupScriptOptions): string {
+  const dir = REMOTE.serverDir
+
+  if (opts.flavor === 'vanilla' || !opts.loader) {
+    return `echo "=== 下載 Minecraft 伺服器 ==="
+curl -fsSL -o ${dir}/server.jar "${opts.serverJarUrl}"
+LAUNCH="-jar ${dir}/server.jar nogui"`
+  }
+
+  if (opts.loader.kind === 'serverJar') {
+    return `echo "=== 下載 Fabric 伺服器 ==="
+# Fabric 的伺服器啟動 jar 會在第一次執行時自己抓齊需要的程式庫，
+# 所以這裡跟原版一樣只要下載一個檔案。
+curl -fsSL -o ${dir}/server.jar "${opts.loader.url}"
+mkdir -p ${dir}/mods
+LAUNCH="-jar ${dir}/server.jar nogui"`
+  }
+
+  return `echo "=== 安裝模組載入器 ==="
+curl -fsSL -o ${dir}/installer.jar "${opts.loader.url}"
+cd ${dir}
+java -jar ${dir}/installer.jar --installServer ${dir}
+rm -f ${dir}/installer.jar ${dir}/installer.jar.log
+mkdir -p ${dir}/mods
+
+# 裝完了，找出這一版要怎麼啟動
+ARGS_FILE=$(ls ${dir}/libraries/net/neoforged/neoforge/*/unix_args.txt 2>/dev/null | head -1)
+if [ -z "$ARGS_FILE" ]; then
+  ARGS_FILE=$(ls ${dir}/libraries/net/minecraftforge/forge/*/unix_args.txt 2>/dev/null | head -1)
+fi
+
+if [ -n "$ARGS_FILE" ]; then
+  # 1.17 之後：安裝程式產生一份參數檔，裡面是 classpath 與主類別
+  LAUNCH="@$ARGS_FILE nogui"
+else
+  # 1.17 之前：安裝程式直接產生一個可以執行的 jar
+  FORGE_JAR=$(ls ${dir}/forge-*.jar 2>/dev/null | grep -v installer | head -1)
+  if [ -z "$FORGE_JAR" ]; then
+    echo "安裝程式跑完了，但找不到可以啟動的檔案" >&2
+    exit 1
+  fi
+  LAUNCH="-jar $FORGE_JAR nogui"
+fi`
 }
 
 /**
@@ -22,8 +86,9 @@ export interface StartupScriptOptions {
  * 「崩潰自動重開」，這兩件事用 screen 都要自己補，而且補得不可靠。
  */
 export function buildStartupScript(opts: StartupScriptOptions): string {
-  const { serverJarUrl, javaMajorVersion, jvmHeap, backupIntervalHours } = opts
+  const { javaMajorVersion, jvmHeap, backupIntervalHours } = opts
   const dir = REMOTE.serverDir
+  const installBlock = buildInstallBlock(opts)
 
   return `#!/bin/bash
 set -euo pipefail
@@ -46,8 +111,7 @@ useradd -r -m -d ${dir} -s /usr/sbin/nologin minecraft || true
 mkdir -p ${dir} ${REMOTE.backupDir}
 cd ${dir}
 
-echo "=== 下載 Minecraft 伺服器 ==="
-curl -fsSL -o ${dir}/server.jar "${serverJarUrl}"
+${installBlock}
 
 # 同意 Minecraft 使用者條款。使用者在 CraftLift 的建立流程中已被告知這一點。
 echo "eula=true" > ${dir}/eula.txt
@@ -182,7 +246,10 @@ Wants=network-online.target
 Type=simple
 User=minecraft
 WorkingDirectory=${dir}
-ExecStart=/usr/bin/java -Xms${jvmHeap} -Xmx${jvmHeap} -jar ${dir}/server.jar nogui
+# $LAUNCH 由上面的安裝段決定：原版與 Fabric 是 -jar server.jar，
+# Forge／NeoForge 則是安裝程式產生的參數檔。這裡是用 shell 展開寫進
+# 檔案的，所以最後留在 unit 裡的是展開後的字面值。
+ExecStart=/usr/bin/java -Xms${jvmHeap} -Xmx${jvmHeap} $LAUNCH
 # 關機時給伺服器 90 秒好好存檔，不要直接砍掉
 ExecStop=/usr/bin/python3 ${dir}/rcon.py stop
 TimeoutStopSec=90

@@ -126,6 +126,27 @@ export default {
         'This is a rough estimate, useful for comparing configurations. Your actual cost is whatever Google bills you, and CraftLift takes no responsibility for the accuracy of this figure. It excludes network egress, discounts and free credits.'
     },
     version: 'Minecraft version',
+    flavor: 'Server type',
+    vanilla: 'Vanilla',
+    modded: 'Modded',
+    loaders: {
+      fabric: { name: 'Fabric', desc: 'Light, updates fastest' },
+      neoforge: { name: 'NeoForge', desc: 'The mainstream since 1.20.2' },
+      forge: { name: 'Forge', desc: 'Most older mods' }
+    },
+    loaderNeeds: 'Needs Minecraft {{version}} or newer',
+    loaderTooOld:
+      '{{loader}} has no build for Minecraft {{version}}. Pick another loader, or choose a newer Minecraft version above.',
+    loaderVersion: 'Loader version',
+    loaderVersionHint:
+      'Use the recommended one unless you know otherwise. Older builds are usually for a mod that only supports that version.',
+    loaderRecommended: 'Recommended (latest stable)',
+    loaderBeta: 'beta',
+    loaderLoading: 'Loading versions…',
+    loaderUnavailable: 'Could not load the version list; the recommended build will be used.',
+    moddedNote:
+      'Your players need the same loader and the same mods installed, or they cannot connect.',
+    moddedMemory: 'Mods are memory hungry — {{gb}} GB or more is recommended.',
     showAdvanced: 'Show advanced settings',
     hideAdvanced: 'Hide advanced settings',
     zone: 'Data centre',
@@ -159,6 +180,7 @@ export default {
     boot: 'Start',
     delete: 'Delete server',
     version: 'Version',
+    loader: 'Loader',
     machine: 'Machine',
     zone: 'Data centre',
     shutdownNote:
@@ -169,9 +191,56 @@ export default {
       console: 'Console',
       properties: 'Server settings',
       players: 'Players',
+      mods: 'Mods',
       files: 'Files',
       backups: 'Backups'
     }
+  },
+  mods: {
+    /* 英文要分單複數，跟「檔案」分頁同一套寫法 */
+    count_one: '{{count}} mod',
+    count_other: '{{count}} mods',
+    disabledCount_one: '{{count}} disabled',
+    disabledCount_other: '{{count}} disabled',
+    upload: 'Upload mods',
+    onlyJar: 'Mods must be .jar files.',
+    someSkipped_one: '{{count}} file was not a .jar and was skipped.',
+    someSkipped_other: '{{count}} files were not .jar files and were skipped.',
+    restartNote: 'Mods are only loaded when Minecraft starts.',
+    needRestart: 'Mods changed — restart Minecraft for it to take effect.',
+    restartNow: 'Restart',
+    restarting: 'Restarting…',
+    confirmRestart:
+      'Minecraft will restart and be unreachable for about a minute. The world is unaffected.',
+    confirmPlayers: '{{n}} players are online and will be kicked.',
+    on: 'Enabled',
+    off: 'Disabled',
+    enable: 'Enable',
+    disable: 'Disable',
+    empty: 'No mods yet. Drag .jar files in from your PC to upload them.',
+    detailsFileName: 'File name',
+    columns: {
+      name: 'Mod',
+      modified: 'Modified',
+      state: 'State',
+      size: 'Size'
+    },
+    menu: {
+      upload: 'Upload mods…'
+    },
+    busy: {
+      upload: 'Uploading…',
+      download: 'Downloading…',
+      delete: 'Deleting…',
+      enable: 'Enabling…',
+      disable: 'Disabling…',
+      checking: 'Checking…'
+    },
+    confirmDeleteTitle: 'Delete mods',
+    confirmDelete_one: 'Delete this mod?',
+    confirmDelete_other: 'Delete these {{count}} mods?',
+    confirmDeleteNote:
+      'You would have to download them again. To turn one off temporarily, use Disable instead.'
   },
   console: {
     machineOff: 'The machine is not running',

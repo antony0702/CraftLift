@@ -7,6 +7,7 @@ import { REMOTE } from '@shared/constants'
 import type { FileEntry, SFTPWrapper } from 'ssh2'
 import type {
   Backup,
+  ModFile,
   PlayerLists,
   RemoteFile,
   ServerProperties,
@@ -427,6 +428,34 @@ export async function downloadPath(
     // 用 sudo 刪：chown 那步若沒跑到，暫存還是 root 的，一般身分刪不掉
     await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
   }
+}
+
+// ---------------------------------------------------------------------------
+// 模組
+// ---------------------------------------------------------------------------
+
+/**
+ * 列出 mods 資料夾裡的模組。
+ *
+ * 只認 .jar 與 .jar.disabled——載入器也只看這些，資料夾裡其他東西
+ * （設定檔、快取）不是模組，列出來只會讓人以為可以停用它們。
+ *
+ * 資料夾不存在時 listFiles 會拿到空輸出而不是丟例外，剛好就是我們要的：
+ * 一台還沒放過模組的伺服器回傳空清單，不是錯誤。
+ */
+export async function listMods(conn: ServerConnection): Promise<ModFile[]> {
+  const files = await listFiles(conn, REMOTE.modsDir)
+  return files
+    .filter((f) => !f.isDirectory && /\.jar(\.disabled)?$/i.test(f.name))
+    .map((f) => ({
+      fileName: f.name,
+      path: f.path,
+      name: f.name.replace(/\.disabled$/i, '').replace(/\.jar$/i, ''),
+      enabled: !/\.disabled$/i.test(f.name),
+      size: f.size,
+      modifiedAt: f.modifiedAt
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // ---------------------------------------------------------------------------

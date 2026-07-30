@@ -132,8 +132,13 @@ export default function ServerList({
                       {copied === server.name ? t('common.copied') : server.externalIp}
                     </button>
                   )}
+                  {/* 模組伺服器要一眼認得出來——連進去之前得先知道自己
+                      的遊戲要不要裝載入器 */}
                   <span className="spec fact">
-                    {server.mcVersion} · {server.machineType} · {server.zone}
+                    {server.mcVersion}
+                    {server.flavor !== 'vanilla' &&
+                      ` ${t(`create.loaders.${server.flavor}.name`)}`}{' '}
+                    · {server.machineType} · {server.zone}
                   </span>
                   <div className="acts">
                     <button type="button" className="torch big" onClick={() => onOpen(server)}>

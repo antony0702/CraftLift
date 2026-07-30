@@ -1,6 +1,6 @@
 {
   "name": "craftlift",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "在 Google Cloud 上一鍵架設 Minecraft 伺服器 / One-click Minecraft server hosting on Google Cloud",
   "main": "./out/main/index.js",
   "author": "antony0702",

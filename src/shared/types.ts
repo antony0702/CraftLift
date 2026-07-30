@@ -39,6 +39,28 @@ export type InstanceState =
   | 'SUSPENDED'
   | 'UNKNOWN'
 
+/**
+ * 伺服器跑的是哪一種主程式。
+ *
+ * vanilla 是 Mojang 官方的 server.jar；其餘三個是社群做的模組載入器，
+ * 玩家端必須裝同一個載入器、同一份模組才連得進來。
+ *
+ * 這個聯集會再長——插件伺服器（Paper）預計在之後的版本加入。加新成員時
+ * 要一併檢查 LOADERS 常數與所有 switch，別讓新種類靜靜掉進 vanilla 分支。
+ */
+export type ServerFlavor = 'vanilla' | 'fabric' | 'neoforge' | 'forge'
+
+/** 模組載入器，也就是 vanilla 以外的種類 */
+export type ModLoader = Exclude<ServerFlavor, 'vanilla'>
+
+/** 某個載入器可以搭配某個 Minecraft 版本的一個版本 */
+export interface LoaderVersion {
+  /** 載入器自己的版本號，例如 Fabric 的 0.17.2、NeoForge 的 21.4.60 */
+  id: string
+  /** 正式版。false 代表 beta 之類的測試版本。 */
+  stable: boolean
+}
+
 /** 一台 Minecraft 伺服器 */
 export interface MinecraftServer {
   /** GCP 執行個體名稱，例如 craftlift-a1b2c3d4。永遠是安全字元。 */
@@ -51,6 +73,15 @@ export interface MinecraftServer {
   externalIp: string | null
   machineType: string
   mcVersion: string
+  /**
+   * 主程式種類。
+   *
+   * v1.1.0 之前建立的機器沒有這個 metadata，主行程一律填 'vanilla'——
+   * 那些機器裝的確實是原版。畫面這端可以當它一定有值。
+   */
+  flavor: ServerFlavor
+  /** 載入器版本。原版時為 null。 */
+  loaderVersion: string | null
   tier: string
   createdAt: string | null
 }
@@ -92,6 +123,15 @@ export interface PriceEstimate {
 export interface CreateServerOptions {
   displayName: string
   mcVersion: string
+  /** 主程式種類。預設 'vanilla'。 */
+  flavor: ServerFlavor
+  /**
+   * 載入器版本。
+   *
+   * 空字串代表「交給 CraftLift 挑」——主行程會取該 Minecraft 版本
+   * 對應的最新正式版。原版時忽略這個欄位。
+   */
+  loaderVersion: string
   /** GCP 機型名稱。可以是預設規格，也可以是 e2-custom-4-8192 這種自訂規格。 */
   machineType: string
   /** 這個機型的核心數與記憶體，用來換算 JVM 記憶體與顯示 */
@@ -147,6 +187,25 @@ export interface UploadItem {
   localPath: string
   remotePath: string
   replace?: boolean
+}
+
+/**
+ * mods 資料夾裡的一個模組。
+ *
+ * 「停用」在 Minecraft 的模組生態裡就是把副檔名改成 .jar.disabled——
+ * 載入器只認 .jar，改個名字它就看不到了。這比刪掉好：使用者排查衝突時
+ * 可以一個一個關掉再開回來，不用重新下載。
+ */
+export interface ModFile {
+  /** 磁碟上的實際檔名，停用時結尾是 .disabled */
+  fileName: string
+  /** mods 資料夾裡的完整路徑。檔案操作（刪除、下載、改名）都用這個。 */
+  path: string
+  /** 去掉副檔名後的名稱，給人看的 */
+  name: string
+  enabled: boolean
+  size: number
+  modifiedAt: number
 }
 
 /** VM 上的一份備份 */
