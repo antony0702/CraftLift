@@ -95,18 +95,21 @@ export function TransferRow({
       {/* 暫停時進度條停在原地不動：不確定進度那種跑動的動畫會讓人以為還在傳 */}
       <Progress percent={stopped ? 100 : percent} frozen={tone === 'paused'} />
       {percent !== null && !stopped && <span className="fact pct">{percent}%</span>}
+      {/* 暫停與繼續的圖示用 CSS 畫，不用文字符號：▮▮ 這類方塊字元的寬高
+          由字型決定，在 11px 的格線上比例會歪掉。畫出來的才對得準，
+          也才跟這套介面的硬邊像素語彙一致。 */}
       {onResume && (
-        <button type="button" className="icon-btn" title={resumeTitle} onClick={onResume}>
-          ▶
+        <button type="button" className="icon-btn glyph-btn" title={resumeTitle} onClick={onResume}>
+          <i className="ic-play" />
         </button>
       )}
       {onPause && (
-        <button type="button" className="icon-btn" title={pauseTitle} onClick={onPause}>
-          ▮▮
+        <button type="button" className="icon-btn glyph-btn" title={pauseTitle} onClick={onPause}>
+          <i className="ic-pause" />
         </button>
       )}
       {onCancel && (
-        <button type="button" className="icon-btn" title={cancelTitle} onClick={onCancel}>
+        <button type="button" className="icon-btn cancel-btn" title={cancelTitle} onClick={onCancel}>
           ✕
         </button>
       )}

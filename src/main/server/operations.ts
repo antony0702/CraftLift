@@ -504,6 +504,43 @@ export async function localSize(path: string): Promise<number> {
 }
 
 /**
+ * 上傳完之後量一下遠端實際收到多少，對不上就報錯。
+ *
+ * 傳輸中途被截掉是不會有任何錯誤訊息的，沒有這一步的話畫面會顯示上傳
+ * 成功，而遠端那個檔案是壞的。
+ *
+ * 這一段刻意跟上面的搬移分開跑，而且量不到就直接放過。第一版把它接在
+ * 搬移的 && 鏈尾巴，結果一個成功的 3GB 上傳被判成失敗——四個錯疊在一起：
+ *
+ *  1. `du` 沒加 sudo。/opt/minecraft 是 minecraft 的，登入的使用者連
+ *     進去都不行（這個檔案裡每一個讀取都有 sudo，就是這個原因）。
+ *  2. 錯誤被管線吃掉。`du … | cut` 的結束碼是 cut 的，永遠是 0。
+ *  3. `Number('')` 是 0 不是 NaN。於是「量不到」被講成「實際 0 位元組」。
+ *  4. 就算前三個都對，`du` 也還是錯的量法——它會把每個資料夾自己佔的
+ *     區塊算進去，而本機那邊只加總檔案大小，資料夾一多就永遠不相等。
+ *
+ * 所以現在：只加總一般檔案的大小、find 成功才輸出標記、沒有標記就
+ * 什麼都不說。「無法確認」不等於「壞了」。
+ */
+async function verifyUploadedSize(
+  conn: ServerConnection,
+  remotePath: string,
+  expected: number
+): Promise<void> {
+  const probe = await conn.exec(
+    `if OUT=$(sudo find ${sq(remotePath)} -type f -printf '%s\\n'); then ` +
+      `echo "CRAFTLIFT_SIZE:$(printf '%s\\n' "$OUT" | awk '{s+=$1} END{print s+0}')"; fi`
+  )
+  const measured = probe.stdout.match(/CRAFTLIFT_SIZE:(\d+)/)
+  if (!measured) return
+
+  const uploaded = Number(measured[1])
+  if (uploaded !== expected) {
+    throw new Error(`上傳沒有完整送達：預期 ${expected} 位元組，實際 ${uploaded}。請重試一次。`)
+  }
+}
+
+/**
  * 上傳一個本機檔案或資料夾。
  *
  * 資料夾整棵先進暫存區再一次搬過去，這樣不論幾個檔案都只花一次 sudo。
@@ -532,20 +569,11 @@ export async function uploadPath(
     const result = await conn.exec(
       `${clear}sudo chown -R minecraft:minecraft ${sq(staging)} && ` +
         `sudo chmod -R u=rwX,go=rX ${sq(staging)} && ` +
-        `sudo cp -a -- ${sq(staging)} ${sq(remotePath)} && ` +
-        // 搬完之後把實際大小回報一次。傳輸中途被截掉是不會有錯誤訊息的，
-        // 沒有這一步的話畫面會顯示上傳成功，而遠端那個檔案是壞的。
-        `du -sb ${sq(remotePath)} | cut -f1`
+        `sudo cp -a -- ${sq(staging)} ${sq(remotePath)}`
     )
     if (result.code !== 0) throw new Error(result.stderr.trim() || '上傳失敗')
 
-    const uploaded = Number(result.stdout.trim().split('\n').pop())
-    const expected = await localSize(localPath)
-    if (Number.isFinite(uploaded) && uploaded !== expected) {
-      throw new Error(
-        `上傳沒有完整送達：預期 ${expected} 位元組，實際 ${uploaded}。請重試一次。`
-      )
-    }
+    await verifyUploadedSize(conn, remotePath, await localSize(localPath))
   } finally {
     // 半路失敗也要清，不然 /tmp 會慢慢被沒人認領的半成品塞滿
     await conn.exec(`sudo rm -rf -- ${sq(staging)}`)

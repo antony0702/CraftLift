@@ -1237,12 +1237,42 @@ button.danger:hover:not(:disabled) {
   width: 22px;
   height: 22px;
   padding: 0;
-  font-size: 9px;
   line-height: 1;
   color: var(--dust);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .transfer .icon-btn:hover:not(:disabled) {
   color: var(--bone);
+}
+/* 叉叉用字元就夠了，但要夠粗才跟旁邊畫出來的圖示壓得住同樣的份量 */
+.transfer .cancel-btn {
+  font-size: 11px;
+  font-weight: 700;
+}
+/* 暫停與繼續用畫的。方塊與三角形的文字符號寬高由字型決定，在 11px 的
+   格線上一定歪；畫出來的才對得準，邊也才是硬的。 */
+.glyph-btn i {
+  display: block;
+}
+.ic-pause {
+  width: 9px;
+  height: 9px;
+  /* 兩條 3px 的直條，中間留 3px。用 box-shadow 畫第二條，省一個節點。 */
+  background: currentColor;
+  box-shadow: 6px 0 0 currentColor;
+  width: 3px;
+}
+.ic-play {
+  /* 邊框畫的三角形：左邊實心、上下透明，就是一個朝右的箭頭 */
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid currentColor;
+  /* 三角形的視覺重心偏左，往右推一點才會落在按鈕正中央 */
+  margin-left: 2px;
 }
 .progress {
   display: inline-flex;
