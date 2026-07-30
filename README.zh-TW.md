@@ -22,13 +22,20 @@ Google 規定：建立 Google 帳號、綁定信用卡，這兩件事必須由�
 ### 關於錢
 
 - Google 給新帳號 **$300 額度，有效期 90 天**，兩者哪個先到就結束。
-- **Google 絕對不會自動刷你的卡。** 額度用完或 90 天到期時，你的試用帳單帳戶會關閉、
-  資源停止運作，經過 30 天寬限期後刪除。除非**你自己**手動點選升級為付費帳戶，
-  否則不會被收取任何費用。
+- **Google 絕對不會自動刷你的卡。** 額度用完或試用期結束時，你的試用帳單帳戶會關閉、
+  資源停止運作。除非**你自己**手動點選升級為付費帳戶，否則不會被收取任何費用。
 - 只要你的帳單帳戶維持在試用狀態，**CraftLift 不可能讓你花到真的錢**。
-- CraftLift 不會顯示自己算出來的預估金額——因為算錯比不算更糟。它改成給你一個按鈕
-  直接打開 Google 官方的額度頁面，並自動幫你設定預算警示，讓 Google 直接寄信通知你。
+- 建立伺服器前會顯示費用估算，單價取自 Google Cloud Billing Catalog API 的即時資料。
+  請當成估算看待：它只涵蓋機器、固定位址與磁碟，**不含網路流量費用，也不含任何折扣
+  或免費額度**。CraftLift 另外會自動幫你設定預算警示讓 Google 直接寄信通知你，並提供
+  按鈕打開 Google 官方的額度頁面——**以那邊的數字為準**。
 - CraftLift 全程不會接觸你的信用卡資料。付款一律在 Google 自己的網站上、你的瀏覽器裡完成。
+
+> **關於這一節的效力。** 以上有關 Google Cloud 計費方式、試用條件與資源處置的說明
+> **僅供參考**，一律以 [Google 官方公告](https://cloud.google.com/free)為準。Google 得隨時
+>變更相關政策而不另行通知，本專案不對上述說明的正確性、即時性或完整性作任何擔保，
+> 亦不就因此產生的任何費用、資料損失或其他損害負擔任何責任。
+> **你的 Google Cloud 帳單與用量，由你自己負責。**
 
 **本軟體不提供任何擔保。你必須自行為你的 Google Cloud 用量與費用負責。**
 完整免責條款請見[授權條款](LICENSE)。
@@ -48,7 +55,7 @@ Google 規定：建立 Google 帳號、綁定信用卡，這兩件事必須由�
   或是自己換掉伺服器主程式
 - VM 上自動輪替備份，另外在關機前自動把存檔拉回你的電腦
 - `server.properties` 圖形化編輯、玩家管理（白名單／管理員／封鎖）
-- 想自己動手時可用的 SSH 終端機
+- 設定裡可以登出 Google 帳號，撤銷這台電腦上的憑證並回到首次設定畫面
 
 ## 更新
 
@@ -64,7 +71,8 @@ SHA512 校驗，對不上就中止。
 | 東西 | 放在哪 |
 | --- | --- |
 | 偏好設定 | `%APPDATA%\CraftLift\preferences.json` |
-| Google Cloud 登入憑證與 SSH 金鑰 | `~\.ssh`（由 Google Cloud CLI 管理） |
+| Google Cloud 登入憑證 | `%APPDATA%\gcloud`（由 Google Cloud CLI 管理） |
+| SSH 金鑰 | `~\.ssh\google_compute_engine`（由 Google Cloud CLI 產生） |
 | 本機備份 | `文件\CraftLift Backups`（可在設定裡改） |
 | 伺服器、世界存檔 | 在你的 Google Cloud 上 |
 
@@ -80,7 +88,7 @@ commit、workflow 與那一次 run，並登記進公開的透明性日誌。簽�
 安裝之前，先用 [GitHub CLI](https://cli.github.com) 驗一下：
 
 ```bash
-gh attestation verify CraftLift-Setup-1.0.0.exe --repo antony0702/CraftLift
+gh attestation verify CraftLift-1.0.0-Setup.exe --repo antony0702/CraftLift
 ```
 
 通過的話，你就知道手上這個檔案確實是從這裡的原始碼編出來的，而且看得到是哪一個 commit。
@@ -89,7 +97,7 @@ gh attestation verify CraftLift-Setup-1.0.0.exe --repo antony0702/CraftLift
 你也可以核對 Release 頁面上 `SHA256SUMS.txt` 裡的校驗碼：
 
 ```powershell
-Get-FileHash CraftLift-Setup-1.0.0.exe -Algorithm SHA256
+Get-FileHash CraftLift-1.0.0-Setup.exe -Algorithm SHA256
 ```
 
 不過要知道校驗碼的天花板：它是我們自己算、自己貼上去的，只擋得住「檔案在傳輸途中被改」，
@@ -101,8 +109,14 @@ Get-FileHash CraftLift-Setup-1.0.0.exe -Algorithm SHA256
 
 ## 開發狀態
 
-1.0.0 是第一個公開版本。整條流程——設定、建立伺服器、日常管理、備份、關機、刪除
-——都已經對真實的 Google Cloud 帳號實測過。
+1.0.0 是第一個公開版本。
+
+已經對真實的 Google Cloud 帳號實測過的部分：首次設定、建立伺服器、開關機、主控台與
+指令、`server.properties` 編輯、玩家管理、檔案管理、備份與拉回本機、刪除單一伺服器
+（連同磁碟與靜態 IP）。
+
+**還沒有完整跑過的部分**：設定裡的「徹底清除（刪除所有雲端資源）」。那個功能已經實作，
+但整條路徑沒有真的執行過一次。
 
 仍然會有粗糙的地方。發現問題或有建議，可以用程式裡的**設定 → 意見回饋**，
 或直接在這裡開一個 issue。

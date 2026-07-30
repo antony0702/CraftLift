@@ -39,17 +39,43 @@ export function getUpdateState(): UpdateState {
  */
 function friendlyError(err: Error): string {
   const raw = err.message || String(err)
+
   if (/ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ENOTFOUND|ETIMEDOUT/i.test(raw)) {
     return '連不上網路，稍後再試'
-  }
-  // 還沒發過任何一版，或該版沒附 latest.yml。對使用者而言等同「沒有更新」。
-  if (/404|latest\.yml|No published versions/i.test(raw)) {
-    return '目前沒有可用的更新'
   }
   if (/sha512|checksum|signature/i.test(raw)) {
     return '下載到的檔案校驗不符，已中止安裝'
   }
-  return raw
+  /*
+   * 還沒發過任何正式版本，或該版沒附 latest.yml。對使用者而言這不是錯誤，
+   * 就是「沒有更新」。實際遇到的訊息長這樣：
+   *
+   *   Cannot parse releases feed: Error: Unable to find latest version on
+   *   GitHub (…/releases/latest), please ensure a production release exists:
+   *   HttpError: 406
+   *
+   * 先前只認 404 與字面上的 latest.yml，所以這一整串連同堆疊追蹤與 GitHub
+   * 的 CSP 標頭全部被原樣送到畫面上。
+   */
+  if (
+    /production release|Unable to find latest version|Cannot parse releases feed|No published versions|latest\.yml|HttpError: 4\d\d|\b404\b/i.test(
+      raw
+    )
+  ) {
+    return '目前沒有可用的更新'
+  }
+  // GitHub 自己出問題或擋流量，跟「沒有更新」是兩回事，使用者的處置也不同
+  if (/HttpError: 5\d\d|rate limit|API rate/i.test(raw)) {
+    return 'GitHub 暫時無法連線，稍後再試'
+  }
+
+  /*
+   * 最後這條防線本來是 `return raw`，而 raw 可能是好幾千字的堆疊追蹤加上
+   * HTTP 標頭。不管是什麼沒預期到的錯誤，都不該把一整面牆倒到使用者臉上，
+   * 所以只取第一行並限制長度。
+   */
+  const firstLine = raw.split('\n')[0].trim()
+  return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine || '更新檢查失敗'
 }
 
 /**

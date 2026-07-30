@@ -101,7 +101,7 @@ jobs:
       # repo、commit SHA、workflow 檔案與這一次 run，並寫進 Sigstore 的
       # 公開透明性日誌。使用者跑：
       #
-      #   gh attestation verify CraftLift-Setup-<版本>.exe --repo antony0702/CraftLift
+      #   gh attestation verify CraftLift-<版本>-Setup.exe --repo antony0702/CraftLift
       #
       # 就能確認手上的檔案來自哪一個 commit，再自己去讀那份原始碼。
       # 對一個開源專案來說這是必要的一環——程式碼公開卻沒人能確認 exe
