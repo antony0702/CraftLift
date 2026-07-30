@@ -632,8 +632,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>
     withConnection(name, zone, ops.listBackups)
   )
-  handle('backup:create', async (name: string, zone: string): Promise<string> =>
-    withConnection(name, zone, ops.createBackup)
+  handle(
+    'backup:create',
+    async (name: string, zone: string, kind: 'world' | 'setup' | 'all' = 'all'): Promise<string> =>
+      withConnection(name, zone, (conn) => ops.createBackup(conn, kind))
   )
   handle('backup:setInterval', async (name: string, zone: string, hours: number): Promise<void> => {
     await setPreferences({ backupIntervalHours: hours })

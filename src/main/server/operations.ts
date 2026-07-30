@@ -729,9 +729,19 @@ export async function listBackups(conn: ServerConnection): Promise<Backup[]> {
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
 }
 
-/** 立刻執行一次備份（會先叫伺服器把資料寫入磁碟） */
-export async function createBackup(conn: ServerConnection): Promise<string> {
-  const result = await conn.exec(`sudo ${REMOTE.serverDir}/backup.sh`)
+/**
+ * 立刻執行一次備份（世界那包會先叫伺服器把資料寫入磁碟）。
+ *
+ * kind 決定備份哪一種。手動備份設定時會強制重打一份——平常那一包只有
+ * 內容變了才重做，但使用者按下按鈕時要的是「現在這一刻的快照」，
+ * 回他一句「沒有變動所以沒做」不是他要的答案。
+ */
+export async function createBackup(
+  conn: ServerConnection,
+  kind: 'world' | 'setup' | 'all' = 'all'
+): Promise<string> {
+  const force = kind === 'setup' ? ' force' : ''
+  const result = await conn.exec(`sudo ${REMOTE.serverDir}/backup.sh ${kind}${force}`)
   if (result.code !== 0) throw new Error(result.stderr.trim() || '備份失敗')
   return result.stdout.trim()
 }

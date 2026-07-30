@@ -227,8 +227,12 @@ const api = {
   /** 備份 */
   backup: {
     list: (name: string, zone: string): Promise<Result<Backup[]>> => invoke('backup:list', name, zone),
-    create: (name: string, zone: string): Promise<Result<string>> =>
-      invoke('backup:create', name, zone),
+    /** 立刻備份。kind 決定備份世界還是模組與設定，不給就兩種都做。 */
+    create: (
+      name: string,
+      zone: string,
+      kind: 'world' | 'setup' | 'all' = 'all'
+    ): Promise<Result<string>> => invoke('backup:create', name, zone, kind),
     setInterval: (name: string, zone: string, hours: number): Promise<Result<void>> =>
       invoke('backup:setInterval', name, zone, hours)
   },

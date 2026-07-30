@@ -1337,6 +1337,10 @@ button.danger:hover:not(:disabled) {
   margin: 0;
   color: var(--bone);
 }
+/* 每一區的標題與自己的備份按鈕同一列 */
+.backup-group .toolbar {
+  margin-bottom: 0;
+}
 .backup-group p {
   margin: 0 0 11px;
 }

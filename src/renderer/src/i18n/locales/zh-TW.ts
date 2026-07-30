@@ -396,21 +396,25 @@ export default {
     warningTitle: '這些備份存在雲端機器上，不是保命備份',
     warningBody:
       '如果試用額度用完或 90 天到期，整台機器連同上面的備份都會被 Google 刪除。真正保得住世界的做法是按「存到電腦」把檔案下載回來。CraftLift 在你按下關機時會自動做這件事。',
-    keepNote: '自動保留最新的 {{count}} 份，較舊的會自動刪除以節省空間。',
-    createNow: '立刻備份',
-    working: '處理中…',
+    keepNote: '每一種各自保留最新的 {{count}} 份，較舊的會自動刪除以節省空間。',
     interval: '自動備份間隔（小時）',
-    intervalHint: '伺服器會依照這個間隔自動備份。備份前會先請 Minecraft 把資料寫入磁碟。',
+    intervalHint: '伺服器會依照這個間隔自動備份世界。備份前會先請 Minecraft 把資料寫入磁碟。',
+    intervalScope:
+      '這個間隔只管世界。伺服器設定不照時間備份——它只有在被改過之後才會多一份，沒動就不會重複存。',
     empty: '（還沒有任何備份）',
-    saveToPc: '存到電腦',
+    saveToPc: '下載至電腦',
     groups: {
       world: {
         title: '世界',
-        desc: '你的存檔。依照上面的間隔自動備份。'
+        desc: '你的存檔。依照上面的間隔自動備份。',
+        createNow: '立刻備份世界',
+        packing: '正在打包世界'
       },
       setup: {
         title: '伺服器設定',
-        desc: '模組、伺服器設定、白名單與管理員名單。只有真的改動過才會多一份。'
+        desc: '模組、伺服器設定、白名單與管理員名單。自動備份只有在改動過之後才會多一份，按下按鈕則不管有沒有變動都會存一份現在的。',
+        createNow: '立刻備份設定',
+        packing: '正在打包設定'
       }
     }
   },

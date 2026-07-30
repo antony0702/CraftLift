@@ -238,6 +238,19 @@ set -uo pipefail
 DIR=${dir}
 STAMP=$(date +%Y%m%d-%H%M%S)
 
+# 用法：backup.sh [world|setup|all] [force]
+#
+#   world  只備份世界
+#   setup  只備份模組與設定
+#   all    兩種都做（預設，排程用的就是這個）
+#
+#   force  設定那一包平常只有內容變了才重打，這個旗標會強制重打一份。
+#          使用者手動按下按鈕時就是要一份現在的快照，不管變沒變。
+WHAT=\${1:-all}
+FORCE=\${2:-}
+
+if [ "$WHAT" = "world" ] || [ "$WHAT" = "all" ]; then
+
 if systemctl is-active --quiet ${REMOTE.serviceName}; then
   python3 "$DIR/rcon.py" save-off  || true
   python3 "$DIR/rcon.py" save-all  || true
@@ -255,6 +268,10 @@ fi
 ls -1t "$DIR"/backups/world-*.tar.gz 2>/dev/null | tail -n +$((${BACKUP_KEEP} + 1)) | xargs -r rm -f
 echo "備份完成: world-$STAMP.tar.gz"
 
+fi
+
+if [ "$WHAT" = "setup" ] || [ "$WHAT" = "all" ]; then
+
 # --- 模組與設定 ---
 #
 # 跟世界分開包，因為兩者的變化頻率差很多：世界每幾小時就不一樣，模組與
@@ -270,7 +287,7 @@ SIG=$( { find "$DIR/mods" -type f -printf '%P\\t%s\\t%T@\\n' 2>/dev/null | sort
          done
        } | md5sum | cut -d' ' -f1 )
 
-if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ]; then
+if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ] || [ "$FORCE" = "force" ]; then
   CONFIGS=""
   for f in server.properties whitelist.json ops.json banned-players.json; do
     [ -f "$DIR/$f" ] && CONFIGS="$CONFIGS $f"
@@ -285,6 +302,8 @@ if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ]; then
   fi
 else
   echo "模組與設定沒有變動，沿用上一份"
+fi
+
 fi
 BACKUP
 chmod +x ${dir}/backup.sh

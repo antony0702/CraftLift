@@ -425,22 +425,27 @@ export default {
     warningTitle: 'These backups live on the cloud machine — they are not a safety net',
     warningBody:
       'If your credit runs out or the 90 days expire, Google deletes the whole machine including these backups. The only thing that really saves your world is pressing “Save to PC”. CraftLift does this automatically when you shut the server down.',
-    keepNote: 'The newest {{count}} are kept automatically; older ones are deleted to save space.',
-    createNow: 'Back up now',
-    working: 'Working…',
+    keepNote:
+      'The newest {{count}} of each kind are kept automatically; older ones are deleted to save space.',
     interval: 'Automatic backup interval (hours)',
     intervalHint:
-      'The server backs itself up on this schedule, asking Minecraft to flush data to disk first.',
+      'The server backs the world up on this schedule, asking Minecraft to flush data to disk first.',
+    intervalScope:
+      'This interval covers the world only. Server setup is not backed up on a schedule — a new copy appears only after something changes, so nothing is stored twice.',
     empty: '(no backups yet)',
-    saveToPc: 'Save to PC',
+    saveToPc: 'Download to PC',
     groups: {
       world: {
         title: 'World',
-        desc: 'Your save. Backed up automatically on the interval above.'
+        desc: 'Your save. Backed up automatically on the interval above.',
+        createNow: 'Back up world now',
+        packing: 'Packing the world'
       },
       setup: {
         title: 'Server setup',
-        desc: 'Mods, server settings, whitelist and operators. A new copy only appears when something actually changed.'
+        desc: 'Mods, server settings, whitelist and operators. The automatic copy only appears after something changes; pressing the button always stores the current state.',
+        createNow: 'Back up setup now',
+        packing: 'Packing the setup'
       }
     }
   },
