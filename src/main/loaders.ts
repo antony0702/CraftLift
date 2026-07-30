@@ -15,11 +15,15 @@ import type { LoaderVersion, ModLoader } from '@shared/types'
  */
 
 const FABRIC_META = 'https://meta.fabricmc.net/v2'
+const MODRINTH_API = 'https://api.modrinth.com/v2'
 const NEOFORGE_MAVEN = 'https://maven.neoforged.net/releases/net/neoforged/neoforge'
 const FORGE_MAVEN = 'https://maven.minecraftforge.net/net/minecraftforge/forge'
 
+/** Modrinth 的使用條款要求呼叫端表明身分，其他來源帶著也無妨 */
+const USER_AGENT = 'antony0702/CraftLift (github.com/antony0702/CraftLift)'
+
 async function fetchJson<T>(url: string, what: string): Promise<T> {
-  const res = await fetch(url)
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
   if (!res.ok) throw new Error(`無法取得${what}（HTTP ${res.status}）`)
   return (await res.json()) as T
 }
@@ -135,6 +139,41 @@ export async function listLoaderVersions(
     throw new Error(`${loader} 沒有搭配 Minecraft ${mcVersion} 的版本`)
   }
   return versions
+}
+
+interface ModrinthVersion {
+  version_number: string
+  version_type: string
+  files: Array<{ url: string; filename: string; primary: boolean }>
+}
+
+/**
+ * Fabric API 的下載網址。
+ *
+ * Fabric 的載入器本身很小，真正提供各種掛鉤的是 Fabric API，而它是一個
+ * 獨立的模組。實測 1.21.4 前四十名熱門 Fabric 模組，有 22 個依賴它，而且
+ * 沒有一個綁死特定版本（依賴宣告的是最低版本，同一個 Minecraft 版本內
+ * 向後相容），所以裝對應版本的最新正式版可以同時滿足所有模組。
+ *
+ * Forge 與 NeoForge 不需要這個——它們的 API 內建在載入器裡。
+ */
+export async function resolveFabricApi(
+  mcVersion: string
+): Promise<{ fileName: string; url: string; version: string }> {
+  const query =
+    `game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}` +
+    `&loaders=${encodeURIComponent(JSON.stringify(['fabric']))}`
+  const versions = await fetchJson<ModrinthVersion[]>(
+    `${MODRINTH_API}/project/fabric-api/version?${query}`,
+    'Fabric API 版本清單'
+  )
+
+  // Modrinth 是新到舊回傳的。優先挑正式版，沒有才退而求其次用最新的。
+  const chosen = versions.find((v) => v.version_type === 'release') ?? versions[0]
+  const file = chosen?.files.find((f) => f.primary) ?? chosen?.files[0]
+  if (!file) throw new Error(`查不到搭配 Minecraft ${mcVersion} 的 Fabric API`)
+
+  return { fileName: file.filename, url: file.url, version: chosen.version_number }
 }
 
 export interface LoaderInstall {

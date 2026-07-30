@@ -21,8 +21,6 @@ import { ErrorText, Loading, Modal, Waiting } from '../../components/Ui'
  * 所以沒有麵包屑、沒有上一頁下一頁、沒有新增資料夾。
  */
 
-const DISABLED_SUFFIX = '.disabled'
-
 type SortKey = 'name' | 'state' | 'size' | 'modified'
 type ConflictChoice = 'replace' | 'keep' | 'skip'
 
@@ -172,21 +170,24 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   // --- 操作 -----------------------------------------------------------------
 
   /**
-   * 啟用或停用：把 .jar 與 .jar.disabled 之間切換。
+   * 啟用或停用：在 mods 與 mods/inactive 之間搬。
    *
-   * 用 files.rename 而不是自己開一條 IPC——它就是一次改名，而那條路徑
-   * 已經有路徑逃逸防護也驗過了。
+   * 用 files.move 而不是自己開一條 IPC——它就是一次搬檔，而那條路徑已經
+   * 有路徑逃逸防護也驗過了。一次搬一批，不是一個一個搬：每個遠端操作
+   * 都是一趟 SSH 往返，勾了十個就往返十次的話會慢得很明顯。
    */
   const setEnabled = async (targets: ModFile[], enabled: boolean): Promise<void> => {
     const changing = targets.filter((m) => m.enabled !== enabled)
     if (changing.length === 0) return
+    const targetDir = enabled ? REMOTE.modsDir : REMOTE.inactiveModsDir
     await run(t(enabled ? 'mods.busy.enable' : 'mods.busy.disable'), async () => {
-      for (const mod of changing) {
-        const next = enabled
-          ? mod.fileName.slice(0, -DISABLED_SUFFIX.length)
-          : `${mod.fileName}${DISABLED_SUFFIX}`
-        await call(window.api.files.rename(server.name, server.zone, mod.path, next))
-      }
+      await call(
+        window.api.files.move(
+          server.name,
+          server.zone,
+          changing.map((mod) => ({ from: mod.path, to: `${targetDir}/${mod.fileName}` }))
+        )
+      )
       setDirty(true)
       await load()
     })
@@ -492,6 +493,9 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
           <table className="table files-table">
             <thead>
               <tr>
+                {/* 勾選欄沒有標題文字——欄位標題同時是排序按鈕，
+                    而「按一下標題把全部勾起來」跟排序會打架 */}
+                <th className="tick" />
                 {(['name', 'modified', 'state', 'size'] as SortKey[]).map((key) => (
                   <th key={key}>
                     <button type="button" className="col-head" onClick={() => toggleSort(key)}>
@@ -517,9 +521,26 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
                   onDoubleClick={() => primaryAction(mod)}
                   onContextMenu={(e) => openMenu(e, true)}
                 >
+                  {/* 勾選是這一格自己的事，不要順便改動整列的選取，
+                      否則勾一個就把原本選好的一批清掉了 */}
+                  <td
+                    className="tick"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={mod.enabled}
+                      disabled={busyNow}
+                      aria-label={mod.name}
+                      onChange={(e) => void setEnabled([mod], e.target.checked)}
+                    />
+                  </td>
                   <td>
-                    <span className="glyph">{mod.enabled ? '🟩' : '⬛'}</span>
                     <span className="file-name">{mod.name}</span>
+                    {/* Fabric 的副檔名比對區分大小寫，.JAR 它根本不會載入。
+                        標成「啟用中」卻沒作用是最難查的那種問題。 */}
+                    {!mod.loadable && <span className="warn"> {t('mods.badExtension')}</span>}
                   </td>
                   <td className="muted small nowrap">{formatTime(mod.modifiedAt)}</td>
                   <td className="muted small nowrap">{t(mod.enabled ? 'mods.on' : 'mods.off')}</td>
@@ -528,7 +549,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="muted small">
+                  <td colSpan={5} className="muted small">
                     {t('mods.empty')}
                   </td>
                 </tr>

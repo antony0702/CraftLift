@@ -20,6 +20,16 @@ export const REMOTE = {
   serverDir: '/opt/minecraft',
   backupDir: '/opt/minecraft/backups',
   modsDir: '/opt/minecraft/mods',
+  /**
+   * 停用中的模組放這裡。
+   *
+   * 兩個載入器掃 mods 資料夾時都不進子資料夾——Fabric 的
+   * DirectoryModCandidateFinder 把 walkFileTree 的深度設成 1，NeoForge 的
+   * ModsFolderLocator 用的是不遞迴的 Files.list()——所以放進來就等於停用，
+   * 檔名不必動。這比改成 .disabled 好的地方是：mods 底下永遠就是「實際會
+   * 載入的那些」，整包抓回電腦可以直接用。
+   */
+  inactiveModsDir: '/opt/minecraft/mods/inactive',
   logFile: '/opt/minecraft/logs/latest.log',
   serviceName: 'minecraft',
   rconPort: 25575,

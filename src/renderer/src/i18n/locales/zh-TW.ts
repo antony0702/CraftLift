@@ -205,6 +205,7 @@ export default {
     enable: '啟用',
     disable: '停用',
     empty: '還沒有任何模組。把 .jar 檔從電腦拖進來就會上傳。',
+    badExtension: '（副檔名不是小寫 .jar，Fabric 不會載入）',
     detailsFileName: '檔名',
     columns: {
       name: '模組',

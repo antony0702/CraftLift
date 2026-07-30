@@ -218,6 +218,7 @@ export default {
     enable: 'Enable',
     disable: 'Disable',
     empty: 'No mods yet. Drag .jar files in from your PC to upload them.',
+    badExtension: '(extension is not lowercase .jar — Fabric will not load it)',
     detailsFileName: 'File name',
     columns: {
       name: 'Mod',

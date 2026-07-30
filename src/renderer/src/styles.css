@@ -1061,9 +1061,27 @@ button.danger:hover:not(:disabled) {
     inset 0 1px 0 var(--torch),
     inset 0 -1px 0 var(--torch);
 }
-/* 停用的模組變淡。檔案總管裡「已剪下」也是這樣講——東西還在，但現在不算數。 */
-.mods .files-table .row.off td {
+/* 停用的模組變淡。檔案總管裡「已剪下」也是這樣講——東西還在，但現在不算數。
+   勾選欄不跟著變淡：那是唯一能把它開回來的東西，畫成半透明看起來就像
+   按不下去。 */
+.mods .files-table .row.off td:not(.tick) {
   opacity: 0.45;
+}
+/* 勾選欄。寬度貼著方塊本身，不要讓它把檔名欄擠掉。 */
+.files-table .tick {
+  width: 22px;
+  padding-right: 0;
+}
+.files-table .tick input {
+  width: auto;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--torch);
+}
+/* 「這個檔案載入器不會讀」——比一般說明更需要被看見，但還不到錯誤 */
+.warn {
+  color: var(--ember);
+  font-size: 11px;
 }
 
 /* ── 費用估算 ───────────────────────────────────────────────── */

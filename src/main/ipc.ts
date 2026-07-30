@@ -45,7 +45,7 @@ import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
 import { estimatePrice } from './gcloud/pricing'
 import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
-import { listLoaderVersions, resolveLoaderInstall } from './loaders'
+import { listLoaderVersions, resolveFabricApi, resolveLoaderInstall } from './loaders'
 import type { LoaderInstall } from './loaders'
 import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
@@ -242,8 +242,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     // 版本在這裡才定案：畫面送空字串代表「交給 CraftLift 挑」。
     // 定案的結果要寫進機器的 metadata，否則之後查不出裝的是哪一版。
     let loader: LoaderInstall | null = null
+    let fabricApi: { fileName: string; url: string } | null = null
     if (opts.flavor !== 'vanilla') {
       loader = await resolveLoaderInstall(opts.flavor, opts.mcVersion, opts.loaderVersion)
+      // Fabric 的載入器不含 API，絕大多數模組都要它。查不到就讓建立失敗——
+      // 這是一趟 HTTP，重試一次比拿到一台每個模組都裝不起來的伺服器好。
+      if (opts.flavor === 'fabric') {
+        fabricApi = await resolveFabricApi(opts.mcVersion)
+      }
     }
 
     const script = buildStartupScript({
@@ -253,7 +259,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       jvmHeap: jvmHeapFor(opts.memoryGb),
       backupIntervalHours: prefs.backupIntervalHours,
       flavor: opts.flavor,
-      loader: loader ? { kind: loader.kind, url: loader.url } : null
+      loader: loader ? { kind: loader.kind, url: loader.url } : null,
+      fabricApi
     })
     return createServer(projectId, opts, script, loader?.version ?? null)
   })

@@ -18,6 +18,12 @@ export interface StartupScriptOptions {
    *   installer —— 下載的是安裝程式，要在機器上跑 --installServer
    */
   loader: { kind: 'serverJar' | 'installer'; url: string } | null
+  /**
+   * 要一併放進 mods 的 Fabric API。只有 Fabric 需要——Forge 與 NeoForge
+   * 的 API 內建在載入器裡。不裝的話使用者上傳的第一個模組多半會因為
+   * 缺少依賴而讓伺服器起不來。
+   */
+  fabricApi: { fileName: string; url: string } | null
 }
 
 /**
@@ -39,12 +45,28 @@ curl -fsSL -o ${dir}/server.jar "${opts.serverJarUrl}"
 LAUNCH="-jar ${dir}/server.jar nogui"`
   }
 
+  // 停用中的模組放 mods/inactive。兩個載入器掃 mods 都不進子資料夾，
+  // 所以搬進去就等於關掉。兩個資料夾都要先建好，不然第一次停用會失敗。
+  const modDirs = `mkdir -p ${REMOTE.modsDir} ${REMOTE.inactiveModsDir}`
+
   if (opts.loader.kind === 'serverJar') {
     return `echo "=== 下載 Fabric 伺服器 ==="
 # Fabric 的伺服器啟動 jar 會在第一次執行時自己抓齊需要的程式庫，
 # 所以這裡跟原版一樣只要下載一個檔案。
 curl -fsSL -o ${dir}/server.jar "${opts.loader.url}"
-mkdir -p ${dir}/mods
+${modDirs}
+${
+  opts.fabricApi
+    ? `
+echo "=== 下載 Fabric API ==="
+# 絕大多數 Fabric 模組都依賴它，少了它使用者傳上來的第一個模組
+# 就會讓伺服器起不來。抓不到不擋安裝——伺服器本身仍然是好的，
+# 使用者之後可以自己補上。
+curl -fsSL -o ${REMOTE.modsDir}/${opts.fabricApi.fileName} "${opts.fabricApi.url}" || \\
+  echo "Fabric API 下載失敗，請自行放進 mods 資料夾" >&2
+`
+    : ''
+}
 LAUNCH="-jar ${dir}/server.jar nogui"`
   }
 
@@ -53,7 +75,7 @@ curl -fsSL -o ${dir}/installer.jar "${opts.loader.url}"
 cd ${dir}
 java -jar ${dir}/installer.jar --installServer ${dir}
 rm -f ${dir}/installer.jar ${dir}/installer.jar.log
-mkdir -p ${dir}/mods
+mkdir -p ${REMOTE.modsDir} ${REMOTE.inactiveModsDir}
 
 # 裝完了，找出這一版要怎麼啟動
 ARGS_FILE=$(ls ${dir}/libraries/net/neoforged/neoforge/*/unix_args.txt 2>/dev/null | head -1)

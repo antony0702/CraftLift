@@ -192,18 +192,26 @@ export interface UploadItem {
 /**
  * mods 資料夾裡的一個模組。
  *
- * 「停用」在 Minecraft 的模組生態裡就是把副檔名改成 .jar.disabled——
- * 載入器只認 .jar，改個名字它就看不到了。這比刪掉好：使用者排查衝突時
- * 可以一個一個關掉再開回來，不用重新下載。
+ * 「停用」的做法是把檔案搬到 mods/inactive——兩個載入器掃 mods 時都不進
+ * 子資料夾，所以搬進去就等於關掉，檔名不用動。這比刪掉好：排查模組衝突
+ * 就是一個一個關掉再開回來，不用重新下載。
  */
 export interface ModFile {
-  /** 磁碟上的實際檔名，停用時結尾是 .disabled */
+  /** 磁碟上的實際檔名 */
   fileName: string
-  /** mods 資料夾裡的完整路徑。檔案操作（刪除、下載、改名）都用這個。 */
+  /** 完整路徑。停用中的會在 mods/inactive 底下。檔案操作都用這個。 */
   path: string
-  /** 去掉副檔名後的名稱，給人看的 */
+  /** 去掉 .jar 後的名稱，給人看的 */
   name: string
   enabled: boolean
+  /**
+   * 副檔名是不是小寫的 .jar。
+   *
+   * Fabric 的比對區分大小寫（`fileName.endsWith(".jar")`），NeoForge 會先
+   * 轉小寫——所以 MOD.JAR 在 Fabric 上根本不會被載入。畫面要能把這種檔案
+   * 跟真的啟用中的模組分開，否則會標成「啟用中」卻怎麼都沒作用。
+   */
+  loadable: boolean
   size: number
   modifiedAt: number
 }

@@ -435,25 +435,42 @@ export async function downloadPath(
 // ---------------------------------------------------------------------------
 
 /**
- * 列出 mods 資料夾裡的模組。
+ * 列出模組：mods 底下的是啟用中，mods/inactive 底下的是停用中。
  *
- * 只認 .jar 與 .jar.disabled——載入器也只看這些，資料夾裡其他東西
- * （設定檔、快取）不是模組，列出來只會讓人以為可以停用它們。
+ * 只認副檔名是 .jar 的（不分大小寫，因為要把大寫那種也列出來提醒使用者）。
+ * 資料夾裡其他東西——設定檔、快取、載入器自己產生的目錄——不是模組，
+ * 列出來只會讓人以為可以停用它們。
  *
- * 資料夾不存在時 listFiles 會拿到空輸出而不是丟例外，剛好就是我們要的：
+ * 用一次 find 掃兩層，而不是分兩趟。每個遠端操作都是一趟 SSH 往返，
+ * 能合併就合併。
+ *
+ * 資料夾不存在時 find 什麼都不吐而不是丟例外，剛好就是我們要的：
  * 一台還沒放過模組的伺服器回傳空清單，不是錯誤。
  */
 export async function listMods(conn: ServerConnection): Promise<ModFile[]> {
-  const files = await listFiles(conn, REMOTE.modsDir)
-  return files
-    .filter((f) => !f.isDirectory && /\.jar(\.disabled)?$/i.test(f.name))
+  const result = await conn.exec(
+    `sudo find ${sq(REMOTE.modsDir)} ${sq(REMOTE.inactiveModsDir)} ` +
+      `-maxdepth 1 -mindepth 1 -type f -printf '%h\\t%s\\t%T@\\t%f\\0' 2>/dev/null || true`
+  )
+
+  return result.stdout
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => {
+      const [dir, size, mtime, ...nameParts] = entry.split('\t')
+      const name = nameParts.join('\t')
+      return { dir, name, size: Number(size) || 0, mtime: Number(mtime) || 0 }
+    })
+    .filter((f) => /\.jar$/i.test(f.name))
     .map((f) => ({
       fileName: f.name,
-      path: f.path,
-      name: f.name.replace(/\.disabled$/i, '').replace(/\.jar$/i, ''),
-      enabled: !/\.disabled$/i.test(f.name),
+      path: `${f.dir}/${f.name}`,
+      name: f.name.replace(/\.jar$/i, ''),
+      // 路徑決定啟用狀態，檔名不參與判斷
+      enabled: f.dir.replace(/\/+$/, '') !== REMOTE.inactiveModsDir,
+      loadable: f.name.endsWith('.jar'),
       size: f.size,
-      modifiedAt: f.modifiedAt
+      modifiedAt: Math.floor(f.mtime * 1000)
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
