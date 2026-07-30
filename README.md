@@ -25,14 +25,23 @@ Realistically: **about five minutes of following an illustrated guide, then it's
 
 - Google gives new accounts **$300 of credit, valid for 90 days**. Whichever runs out first ends
   the trial.
-- **Google never charges your card automatically.** When the credit or the 90 days run out, your
-  trial billing account closes, your resources stop, and after a 30-day grace period they are
-  deleted. You are not charged unless *you* manually upgrade to a paid account.
+- **Google never charges your card automatically.** When the credit or the trial period runs out,
+  your trial billing account closes and your resources stop. You are not charged unless *you*
+  manually upgrade to a paid account.
 - As long as your billing account stays in trial status, **CraftLift cannot cost you real money.**
-- CraftLift never displays its own cost estimates, because a wrong estimate is worse than none.
-  It gives you a button that opens Google's own billing page instead, and sets up a budget alert
-  so Google emails you directly.
+- CraftLift shows a cost estimate before you create a server, priced from live rates in Google's
+  Cloud Billing Catalog API. Treat it as an estimate: it covers the machine, the fixed address and
+  the disk, and **excludes network egress, discounts and free-tier allowances**. CraftLift also
+  sets up a budget alert so Google emails you directly, and gives you a button that opens Google's
+  own billing page — **those are the numbers that count**.
 - CraftLift never touches your card details. Payment happens on Google's site, in your browser.
+
+> **On the standing of this section.** The statements above about Google Cloud billing, trial
+> terms and how resources are handled are **for reference only**; [Google's own published
+> terms](https://cloud.google.com/free) always govern. Google may change these policies at any
+> time without notice. This project makes no warranty as to their accuracy, currency or
+> completeness, and accepts no liability for any charges, data loss or other damages arising from
+> them. **Your Google Cloud usage and bill are your own responsibility.**
 
 **CraftLift is provided without warranty. You are responsible for your own Google Cloud
 usage and charges.** See the [licence](LICENSE) for the full disclaimer.
@@ -53,7 +62,8 @@ usage and charges.** See the [licence](LICENSE) for the full disclaimer.
   datapacks or swap the server jar yourself
 - Automatic rotating backups on the VM, and the world is pulled back to your PC before shutdown
 - Graphical `server.properties` editor and player (whitelist / op / ban) management
-- An SSH terminal for when you want to get your hands dirty
+- Sign out of your Google account from Settings, which revokes the credentials on this PC and
+  returns the app to first-run setup
 
 ## Updates
 
@@ -70,7 +80,8 @@ none of them are touched:
 | Data | Location |
 | --- | --- |
 | Preferences | `%APPDATA%\CraftLift\preferences.json` |
-| Google Cloud credentials and SSH key | `~\.ssh` (managed by the Google Cloud CLI) |
+| Google Cloud credentials | `%APPDATA%\gcloud` (managed by the Google Cloud CLI) |
+| SSH key | `~\.ssh\google_compute_engine` (created by the Google Cloud CLI) |
 | Local backups | `Documents\CraftLift Backups` (configurable) |
 | Servers and world saves | On your Google Cloud account |
 
@@ -88,7 +99,7 @@ obtain it**, including this project's author.
 Before installing, verify it with the [GitHub CLI](https://cli.github.com):
 
 ```bash
-gh attestation verify CraftLift-Setup-1.0.0.exe --repo antony0702/CraftLift
+gh attestation verify CraftLift-1.0.0-Setup.exe --repo antony0702/CraftLift
 ```
 
 If it passes, the file you hold really was built from the source here, and you can see exactly
@@ -98,7 +109,7 @@ supposed to be worth to a user.**
 You can also check the digest against `SHA256SUMS.txt` on the release page:
 
 ```powershell
-Get-FileHash CraftLift-Setup-1.0.0.exe -Algorithm SHA256
+Get-FileHash CraftLift-1.0.0-Setup.exe -Algorithm SHA256
 ```
 
 Be aware of what a checksum can and cannot do: we compute and publish it ourselves, so it only
@@ -111,8 +122,15 @@ above is what covers the second case.
 
 ## Status
 
-1.0.0 is the first public release. The whole flow — set up, create a server, run it, back it up,
-shut it down, delete it — has been tested against real Google Cloud accounts.
+1.0.0 is the first public release.
+
+Exercised against real Google Cloud accounts: first-run setup, creating a server, starting and
+stopping it, the console and commands, editing `server.properties`, player management, the file
+manager, backups and pulling them to the PC, and deleting an individual server along with its disk
+and static IP.
+
+**Not yet exercised end to end:** "Delete everything" in Settings, which removes the whole cloud
+project. The feature is implemented, but that path has never actually been run.
 
 Expect rough edges. Bug reports and suggestions are welcome, either through **Settings → Feedback**
 in the app or as an issue here.

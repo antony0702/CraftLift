@@ -98,6 +98,9 @@ export default {
     family: '機器系列',
     familyHint:
       'E2 便宜、適合大多數情況；N2／C3 單核效能較好，Minecraft 主要吃單核，人多時會有感。不同區域提供的系列不一樣。',
+    machinesLoading: '正在讀取這個機房提供的機型……',
+    machinesUnavailable:
+      '讀不到這個機房的機型清單，所以下面兩個選單是空的。可能是網路不通，或這個 Google Cloud 專案已經不存在——後者請回到設定登出再重新登入，程式會帶你建立新的專案。',
     predefined: '預設規格',
     custom: '自訂規格',
     customUnsupported: '{{family}} 系列不支援自訂核心與記憶體，請從預設規格中挑選。',
@@ -129,9 +132,9 @@ export default {
     floatingIpHint:
       '浮動 IP 不需額外費用，但伺服器每次重新開機後位址都會改變，你必須重新把新位址告訴所有朋友。預設的固定位址會從你的額度中扣除少量費用。',
     disclaimer:
-      '我了解建立伺服器會消耗我的 Google Cloud 額度；若額度已用完或我的帳戶為付費狀態，將產生實際費用。CraftLift 不對任何費用負責。',
+      '我了解伺服器執行時會消耗我的 Google Cloud 額度，而用量與帳單由我自己負責。我也了解 CraftLift 對 Google 的計費方式不作任何擔保。',
     disclaimerNote:
-      '只要你的帳單帳戶維持在試用狀態，Google 就不會扣款——額度用完時資源會停止，而不是向你收費。',
+      '依 Google 目前的規則，帳單帳戶維持在試用狀態就不會被扣款——額度用完時資源會停止運作，而不是向你收費；除非你自己手動升級成付費帳戶。這是 Google 的政策，可能隨時變更，一律以 Google 官方公告為準。',
     submit: '建立伺服器',
     tiers: {
       small: { name: '小型', players: '2–4 人' },

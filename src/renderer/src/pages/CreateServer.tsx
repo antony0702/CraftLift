@@ -45,6 +45,8 @@ export default function CreateServer({
 
   const [tier, setTier] = useState<string>(DEFAULT_TIER)
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([])
+  const [machinesLoading, setMachinesLoading] = useState(false)
+  const [machinesError, setMachinesError] = useState('')
   const [family, setFamily] = useState('e2')
   const [selectedType, setSelectedType] = useState('')
   const [custom, setCustom] = useState(false)
@@ -76,6 +78,8 @@ export default function CreateServer({
   useEffect(() => {
     if (!advanced) return
     void (async () => {
+      setMachinesLoading(true)
+      setMachinesError('')
       try {
         const list = await call(window.api.machine.list(zone))
         setMachineTypes(list)
@@ -85,7 +89,13 @@ export default function CreateServer({
             : (list.find((m) => m.family === family)?.name ?? '')
         )
       } catch (err) {
-        setMessage(errorText(err))
+        // 清單抓不到時一定要清空並講原因。留著上一批會讓使用者選到這個
+        // 機房根本沒有的機型；靜靜留一個空清單則會變成一條沒有項目的
+        // 下拉選單——那看起來像介面壞了，而不是查詢失敗。
+        setMachineTypes([])
+        setMachinesError(errorText(err))
+      } finally {
+        setMachinesLoading(false)
       }
     })()
   }, [advanced, zone, family])
@@ -260,9 +270,20 @@ export default function CreateServer({
             </select>
           </Field>
 
+          {/* 清單還沒回來或抓不到時，一定要講話。空的 <select> 點下去只會
+              彈出一條沒有任何項目的細線，看起來像介面壞了。 */}
+          {machinesLoading && <p className="muted small">{t('create.machinesLoading')}</p>}
+          {!machinesLoading && machineTypes.length === 0 && (
+            <div className="notice">
+              <p>{t('create.machinesUnavailable')}</p>
+              {machinesError && <p className="muted small fact">{machinesError}</p>}
+            </div>
+          )}
+
           <Field label={t('create.family')} hint={t('create.familyHint')}>
             <select
               value={family}
+              disabled={families.length === 0}
               onChange={(e) => {
                 setFamily(e.target.value)
                 setCustom(false)
@@ -319,7 +340,11 @@ export default function CreateServer({
             </>
           ) : (
             <Field label={t('create.machineType')}>
-              <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+              <select
+                value={selectedType}
+                disabled={inFamily.length === 0}
+                onChange={(e) => setSelectedType(e.target.value)}
+              >
                 {inFamily.map((m) => (
                   <option key={m.name} value={m.name}>
                     {m.name} — {m.cpus} vCPU, {m.memoryGb} GB

@@ -63,6 +63,19 @@ import { checkForUpdate, downloadUpdate, getUpdateState, installUpdate } from '.
  */
 let currentProjectId: string | null = null
 
+/**
+ * 這個執行階段裡被刪掉的專案。
+ *
+ * GCP 的專案刪除不是立即生效的——`projects delete` 之後有一段傳播延遲，
+ * 那幾秒內 `projects list` 仍然會把它列為 ACTIVE。於是「刪完 → 回到首次
+ * 設定 → 立刻查有沒有既有專案」這個順序會把剛死掉的專案撿回來、寫回設定
+ * 檔，並當成目前的專案交給畫面。之後每一個 API 都在打一個不存在的東西。
+ *
+ * 實際踩到的樣子：伺服器清單空白、機型下拉選單只剩一條沒有項目的細線，
+ * 而且沒有任何錯誤訊息。記住自己刪過什麼，就不會再撿回來。
+ */
+const deletedThisSession = new Set<string>()
+
 async function requireProject(): Promise<string> {
   if (currentProjectId) return currentProjectId
   const found = await findExistingProject()
@@ -156,11 +169,17 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle('project:current', async (): Promise<string | null> => {
     if (currentProjectId) return currentProjectId
 
+    /** 剛在這個執行階段刪掉的專案不算數，理由見 deletedThisSession */
+    const usable = (id: string | null): string | null =>
+      id && !deletedThisSession.has(id) ? id : null
+
     const prefs = await getPreferences()
-    if (prefs.lastProjectId) {
-      currentProjectId = prefs.lastProjectId
-      void findExistingProject().then(async (actual) => {
-        if (actual !== prefs.lastProjectId) {
+    const remembered = usable(prefs.lastProjectId)
+    if (remembered) {
+      currentProjectId = remembered
+      void findExistingProject().then(async (found) => {
+        const actual = usable(found)
+        if (actual !== remembered) {
           currentProjectId = actual
           await setPreferences({ lastProjectId: actual })
         }
@@ -168,8 +187,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       return currentProjectId
     }
 
-    currentProjectId = await findExistingProject()
-    if (currentProjectId) await setPreferences({ lastProjectId: currentProjectId })
+    currentProjectId = usable(await findExistingProject())
+    // 記住的那個已經被刪掉時也要寫回去，否則下次啟動又會撿到它
+    if (currentProjectId !== prefs.lastProjectId) {
+      await setPreferences({ lastProjectId: currentProjectId })
+    }
     return currentProjectId
   })
 
@@ -184,6 +206,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     const projectId = await requireProject()
     closeAllConnections()
     await deleteProject(projectId)
+    deletedThisSession.add(projectId)
     currentProjectId = null
     await setPreferences({ lastProjectId: null })
   })

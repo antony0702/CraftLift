@@ -100,6 +100,9 @@ export default {
     family: 'Machine family',
     familyHint:
       'E2 is cheap and fine for most cases; N2 and C3 have better single-core performance, which Minecraft benefits from when many people play. Available families differ by region.',
+    machinesLoading: 'Loading the machine types available in this region…',
+    machinesUnavailable:
+      'The machine type list for this region could not be loaded, so the two menus below are empty. Either the network is unreachable, or this Google Cloud project no longer exists — for the latter, sign out and back in from Settings and the app will walk you through creating a new one.',
     predefined: 'Predefined',
     custom: 'Custom',
     customUnsupported: 'The {{family}} family does not support custom vCPU and memory — pick a predefined type.',
@@ -132,9 +135,9 @@ export default {
     floatingIpHint:
       'A floating IP costs nothing extra, but the server address changes every time the machine restarts, and you have to send the new address to all your friends. The default fixed address consumes a small amount of your credit.',
     disclaimer:
-      'I understand that creating a server consumes my Google Cloud credit, and that if my credit is exhausted or my account is a paid account, real charges will apply. CraftLift is not responsible for any charges.',
+      'I understand that running a server consumes my Google Cloud credit, and that the usage and the bill are my own responsibility. I understand that CraftLift makes no warranty about how Google bills.',
     disclaimerNote:
-      'As long as your billing account stays in trial status, Google will not charge you — when the credit runs out your resources stop rather than being billed.',
+      'Under Google’s current rules a billing account in trial status is never charged — when the credit runs out your resources stop rather than billing you, unless you manually upgrade to a paid account. That is Google’s policy, it may change at any time, and their published terms always govern.',
     submit: 'Create server',
     tiers: {
       small: { name: 'Small', players: '2–4 players' },

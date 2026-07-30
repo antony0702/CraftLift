@@ -89,21 +89,20 @@ function renderArg(arg: GcloudArg): string {
   return `"${arg.literal}"`
 }
 
-/** 執行一次 gcloud 指令，回傳標準輸出 */
-export async function runGcloud(args: GcloudArg[]): Promise<string> {
+async function runGcloudRaw(args: GcloudArg[]): Promise<{ stdout: string; stderr: string }> {
   const gcloudPath = await findGcloud()
   if (!gcloudPath) throw new Error('GCLOUD_NOT_FOUND')
 
   const rendered = args.map(renderArg)
 
   try {
-    const { stdout } = await execFileAsync(`"${gcloudPath}"`, rendered, {
+    const { stdout, stderr } = await execFileAsync(`"${gcloudPath}"`, rendered, {
       shell: true,
       windowsHide: true,
       // gcloud 輸出可能很大（例如列出所有機型），預設 1MB 不夠
       maxBuffer: 64 * 1024 * 1024
     })
-    return stdout
+    return { stdout, stderr }
   } catch (err) {
     // gcloud 把有用的錯誤訊息寫在 stderr，預設的例外訊息只有結束碼，
     // 對除錯完全沒幫助，所以這裡把 stderr 撈出來。
@@ -113,9 +112,55 @@ export async function runGcloud(args: GcloudArg[]): Promise<string> {
   }
 }
 
+/** 執行一次 gcloud 指令，回傳標準輸出 */
+export async function runGcloud(args: GcloudArg[]): Promise<string> {
+  return (await runGcloudRaw(args)).stdout
+}
+
+/**
+ * gcloud 的「部分失敗」。
+ *
+ * 查一個已經不存在、或沒有權限的專案時，gcloud **不會**用非零結束碼告訴你。
+ * 它把警告印到 stderr，stdout 照樣給一個空陣列，結束碼 0。實測：
+ *
+ *   gcloud compute machine-types list --project=<已刪除的專案> --format=json
+ *     stdout : []
+ *     結束碼 : 0
+ *     stderr : WARNING: Some requests did not succeed.
+ *               - The resource 'projects/xxx' was not found
+ *
+ * 照單全收的下場是：伺服器清單顯示「你還沒有任何伺服器」，而不是「你的專案
+ * 不見了」；機型下拉選單變成一條沒有任何項目的細線。對一個管理別人世界存檔
+ * 的程式，這種表現方式是不能接受的——使用者會以為東西真的沒了。
+ *
+ * 判斷刻意保守。實測四種正常查詢（專案清單、帳單帳戶、機型清單、VM 清單）
+ * 的 stderr **完全是空的**；而「真的沒有東西」的空結果，stderr 同樣是空的。
+ * 所以只認下面這幾個字樣，不會把「查得到但沒東西」誤判成失敗。
+ */
+const GCLOUD_PARTIAL_FAILURE =
+  /Some requests did not succeed|was not found|PERMISSION_DENIED|Permission denied|has not been used in project|^ERROR:/im
+
+/** 把 gcloud 的多行警告壓成一句話。細節那一行比開頭的橫幅有用。 */
+function describeFailure(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const detail = lines.find((line) =>
+    /was not found|PERMISSION_DENIED|Permission denied|has not been used in project/i.test(line)
+  )
+  return (detail ?? lines[0] ?? 'gcloud 查詢失敗').replace(/^[-\s]+/, '')
+}
+
 /** 執行 gcloud 並把 JSON 輸出解析好 */
 export async function runGcloudJson<T>(args: GcloudArg[]): Promise<T> {
-  const stdout = await runGcloud([...args, '--format=json'])
+  const { stdout, stderr } = await runGcloudRaw([...args, '--format=json'])
+
+  const noise = stderr.trim()
+  if (noise && GCLOUD_PARTIAL_FAILURE.test(noise)) {
+    throw new Error(describeFailure(noise))
+  }
+
   const trimmed = stdout.trim()
   if (!trimmed) return [] as unknown as T
   return JSON.parse(trimmed) as T
