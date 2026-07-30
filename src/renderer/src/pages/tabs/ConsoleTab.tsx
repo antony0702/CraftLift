@@ -17,6 +17,9 @@ export default function ConsoleTab({ server }: { server: MinecraftServer }): Rea
   const [command, setCommand] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  /** Minecraft 本身在不在跑。機器的電源是左欄管的，這裡管的是服務。 */
+  const [running, setRunning] = useState<boolean | null>(null)
+  const [power, setPower] = useState<'start' | 'stop' | 'restart' | null>(null)
   const logRef = useRef<HTMLPreElement>(null)
   /** 使用者往上捲看歷史時就不要硬把畫面拉回底部 */
   const stick = useRef(true)
@@ -55,6 +58,7 @@ export default function ConsoleTab({ server }: { server: MinecraftServer }): Rea
       try {
         const status = await call(window.api.minecraft.status(server.name, server.zone))
         setPeople(status.players)
+        setRunning(status.running)
       } catch {
         // 啟動過程中 RCON 尚未就緒，屬正常過渡狀態
       }
@@ -83,6 +87,24 @@ export default function ConsoleTab({ server }: { server: MinecraftServer }): Rea
       setMessage(errorText(err))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** 停止與重新啟動會把線上的人踢掉，所以先問一次；啟動不會，直接做。 */
+  const control = async (action: 'start' | 'stop' | 'restart'): Promise<void> => {
+    if (action !== 'start' && people && people.length > 0) {
+      if (!window.confirm(t('console.confirmKick', { n: people.length }))) return
+    }
+    setPower(action)
+    setMessage('')
+    try {
+      await call(window.api.minecraft[action](server.name, server.zone))
+      setRunning(action !== 'stop')
+      if (action === 'stop') setPeople([])
+    } catch (err) {
+      setMessage(errorText(err))
+    } finally {
+      setPower(null)
     }
   }
 
@@ -133,6 +155,31 @@ export default function ConsoleTab({ server }: { server: MinecraftServer }): Rea
           {t('console.send')}
         </button>
       </form>
+
+      {/* Minecraft 本身的電源。左欄那個是整台機器的，兩者不一樣：
+          停掉 Minecraft 機器還在跑，也還在計費。 */}
+      <div className="actions">
+        {running === false ? (
+          <button type="button" disabled={power !== null} onClick={() => void control('start')}>
+            {power === 'start' ? t('console.starting') : t('console.startMc')}
+          </button>
+        ) : (
+          <>
+            <button type="button" disabled={power !== null} onClick={() => void control('restart')}>
+              {power === 'restart' ? t('console.restarting') : t('console.restart')}
+            </button>
+            <button
+              type="button"
+              className="danger"
+              disabled={power !== null}
+              onClick={() => void control('stop')}
+            >
+              {power === 'stop' ? t('console.stopping') : t('console.stopMc')}
+            </button>
+          </>
+        )}
+        <span className="muted small">{t('console.powerNote')}</span>
+      </div>
 
       <ErrorText>{message}</ErrorText>
     </>

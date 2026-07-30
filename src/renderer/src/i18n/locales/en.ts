@@ -100,9 +100,9 @@ export default {
     family: 'Machine family',
     familyHint:
       'E2 is cheap and fine for most cases; N2 and C3 have better single-core performance, which Minecraft benefits from when many people play. Available families differ by region.',
-    machinesLoading: 'Loading the machine types available in this region…',
+    machinesLoading: 'Loading machine types…',
     machinesUnavailable:
-      'The machine type list for this region could not be loaded, so the two menus below are empty. Either the network is unreachable, or this Google Cloud project no longer exists — for the latter, sign out and back in from Settings and the app will walk you through creating a new one.',
+      'Could not load the machine types, so the two menus below are empty. Try signing out and back in from Settings.',
     predefined: 'Predefined',
     custom: 'Custom',
     customUnsupported: 'The {{family}} family does not support custom vCPU and memory — pick a predefined type.',
@@ -135,9 +135,9 @@ export default {
     floatingIpHint:
       'A floating IP costs nothing extra, but the server address changes every time the machine restarts, and you have to send the new address to all your friends. The default fixed address consumes a small amount of your credit.',
     disclaimer:
-      'I understand that running a server consumes my Google Cloud credit, and that the usage and the bill are my own responsibility. I understand that CraftLift makes no warranty about how Google bills.',
+      'I understand that running a server consumes my Google Cloud credit, and that the usage and the bill are mine.',
     disclaimerNote:
-      'Under Google’s current rules a billing account in trial status is never charged — when the credit runs out your resources stop rather than billing you, unless you manually upgrade to a paid account. That is Google’s policy, it may change at any time, and their published terms always govern.',
+      'A trial account is never charged — resources stop when the credit runs out, unless you upgrade to a paid account yourself. Google’s policy may change; their terms govern.',
     submit: 'Create server',
     tiers: {
       small: { name: 'Small', players: '2–4 players' },
@@ -182,8 +182,12 @@ export default {
     nobody: 'Nobody right now',
     players: '{{count}} / {{max}} players online',
     restart: 'Restart',
+    restarting: 'Restarting…',
     stopMc: 'Stop Minecraft',
+    stopping: 'Stopping…',
     startMc: 'Start Minecraft',
+    confirmKick: '{{n}} player(s) online will be disconnected. Continue?',
+    powerNote: 'This controls Minecraft only. The machine keeps running, and billing.',
     noLog: '(no log output yet)',
     commandPlaceholder: 'Type a command, e.g. time set day',
     send: 'Send'
@@ -240,8 +244,7 @@ export default {
     confirmDeleteTitle: 'Delete',
     confirmDelete_one: 'Delete this item?',
     confirmDelete_other: 'Delete these {{count}} items?',
-    noRecycleBin:
-      'There is no recycle bin on the server — deleted files are gone for good. Folders are deleted along with everything inside them.',
+    noRecycleBin: 'No recycle bin — deleted is gone. Folders go with their contents.',
     conflictTitle: 'Name already in use',
     conflictBody_one: 'This location already has an item with the same name:',
     conflictBody_other: 'This location already has {{count}} items with the same names:',
@@ -255,18 +258,16 @@ export default {
     restartHint: 'Restart Minecraft for changes to take effect.'
   },
   props: {
-    restartNote:
-      'These settings are only read when Minecraft starts, so a restart is required for changes to take effect. CraftLift asks you when you press Save, and restarts for you once you confirm.',
+    restartNote: 'Saving restarts Minecraft so changes take effect. You will be asked first.',
     saved: 'Saved',
-    checking: 'Checking status…',
+    checking: 'Checking…',
     restarting: 'Restarting…',
     confirmTitle: 'Save and restart',
     confirmTitleStopped: 'Save settings',
     confirmRunning:
-      'The settings are written to the server, then Minecraft is restarted so they take effect. A restart takes anywhere from ten seconds to a minute, during which the server is unreachable. Your world is not affected.',
-    confirmPlayers: '{{n}} player(s) are online right now and will be disconnected.',
-    confirmStopped:
-      'Minecraft is not currently running, so the settings are only saved — the server will not be started. They will apply the next time it starts.',
+      'Minecraft restarts after saving. Unreachable for up to a minute. Your world is not affected.',
+    confirmPlayers: '{{n}} player(s) online will be disconnected.',
+    confirmStopped: 'Minecraft is not running. Settings are saved and apply on next start.',
     saveAndRestart: 'Save and restart',
     values: {
       peaceful: 'Peaceful',
@@ -375,7 +376,7 @@ export default {
     language: 'Language',
     launchAtLogin: 'Start CraftLift when I log in',
     launchAtLoginHint:
-      'Starts CraftLift in the background at login, minimised to the tray, so managing your server is one click away. It has no effect on the cloud server — that keeps running whether or not this PC is on.',
+      'Waits in the tray at login. Unrelated to the cloud server, which runs regardless.',
     backupOnShutdown: 'Copy the world to my PC before shutting down',
     backupDir: 'Local backup folder',
     defaultDir: '(default: Documents\\CraftLift Backups)',
@@ -410,9 +411,9 @@ export default {
       none: '(not signed in)',
       signOut: 'Sign out',
       working: 'Signing out…',
-      note: 'Signing out only revokes the credentials on this PC. Your servers, worlds and backups stay on Google Cloud, and signing back in with the same account brings all of it back.',
+      note: 'Only revokes the credentials on this PC. Servers and worlds stay in the cloud.',
       confirm:
-        'Sign out? You will be taken back to the initial setup steps and will need to sign in again to manage your servers. Nothing in the cloud is deleted.'
+        'Sign out? You will return to setup and need to sign in again. Nothing in the cloud is deleted.'
     },
     danger: {
       title: 'Delete everything',

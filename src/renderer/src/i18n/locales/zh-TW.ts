@@ -98,9 +98,8 @@ export default {
     family: '機器系列',
     familyHint:
       'E2 便宜、適合大多數情況；N2／C3 單核效能較好，Minecraft 主要吃單核，人多時會有感。不同區域提供的系列不一樣。',
-    machinesLoading: '正在讀取這個機房提供的機型……',
-    machinesUnavailable:
-      '讀不到這個機房的機型清單，所以下面兩個選單是空的。可能是網路不通，或這個 Google Cloud 專案已經不存在——後者請回到設定登出再重新登入，程式會帶你建立新的專案。',
+    machinesLoading: '讀取機型中…',
+    machinesUnavailable: '讀不到機型清單，所以下面兩個選單是空的。試試設定裡的登出再重新登入。',
     predefined: '預設規格',
     custom: '自訂規格',
     customUnsupported: '{{family}} 系列不支援自訂核心與記憶體，請從預設規格中挑選。',
@@ -131,10 +130,9 @@ export default {
     floatingIp: '使用浮動 IP（不建議）',
     floatingIpHint:
       '浮動 IP 不需額外費用，但伺服器每次重新開機後位址都會改變，你必須重新把新位址告訴所有朋友。預設的固定位址會從你的額度中扣除少量費用。',
-    disclaimer:
-      '我了解伺服器執行時會消耗我的 Google Cloud 額度，而用量與帳單由我自己負責。我也了解 CraftLift 對 Google 的計費方式不作任何擔保。',
+    disclaimer: '我了解執行伺服器會消耗我的 Google Cloud 額度，用量與帳單由我自己負責。',
     disclaimerNote:
-      '依 Google 目前的規則，帳單帳戶維持在試用狀態就不會被扣款——額度用完時資源會停止運作，而不是向你收費；除非你自己手動升級成付費帳戶。這是 Google 的政策，可能隨時變更，一律以 Google 官方公告為準。',
+      '試用狀態下不會被扣款——額度用完資源就停止，除非你自己升級成付費帳戶。這是 Google 的政策，可能變更，以官方公告為準。',
     submit: '建立伺服器',
     tiers: {
       small: { name: '小型', players: '2–4 人' },
@@ -178,8 +176,12 @@ export default {
     nobody: '目前沒有人',
     players: '線上 {{count}} / {{max}} 人',
     restart: '重新啟動',
+    restarting: '重新啟動中…',
     stopMc: '停止 Minecraft',
+    stopping: '停止中…',
     startMc: '啟動 Minecraft',
+    confirmKick: '有 {{n}} 人在線上，會被踢出去。要繼續嗎？',
+    powerNote: '這只控制 Minecraft，機器仍在執行與計費。',
     noLog: '（還沒有日誌）',
     commandPlaceholder: '輸入指令，例如 time set day',
     send: '送出'
@@ -232,7 +234,7 @@ export default {
     },
     confirmDeleteTitle: '刪除',
     confirmDelete: '確定要刪除這 {{count}} 個項目嗎？',
-    noRecycleBin: '伺服器上沒有資源回收筒，刪掉就找不回來了。資料夾會連同裡面的東西一起刪除。',
+    noRecycleBin: '沒有資源回收筒，刪掉就找不回來。資料夾會連內容一起刪。',
     conflictTitle: '已經有同名的檔案',
     conflictBody: '這個位置已經有 {{count}} 個同名的項目：',
     conflictReplace: '取代',
@@ -245,18 +247,15 @@ export default {
     restartHint: '存檔後需要重新啟動 Minecraft 才會生效。'
   },
   props: {
-    restartNote:
-      '這些設定只有在 Minecraft 啟動時才會被讀取，所以改完必須重新啟動才會生效。按下儲存時 CraftLift 會問你，確認後就直接幫你重啟。',
+    restartNote: '存檔後會重新啟動 Minecraft 才會生效，按下儲存時會先問你。',
     saved: '已儲存',
-    checking: '確認狀態中…',
+    checking: '確認中…',
     restarting: '重新啟動中…',
     confirmTitle: '儲存並重新啟動',
     confirmTitleStopped: '儲存設定',
-    confirmRunning:
-      '設定會先存回伺服器，接著重新啟動 Minecraft 讓它生效。重啟大約需要十幾秒到一分鐘，這段期間伺服器連不上。世界存檔不會受影響。',
-    confirmPlayers: '目前有 {{n}} 位玩家在線上，他們會被踢出去。',
-    confirmStopped:
-      'Minecraft 目前沒有在執行，所以只會把設定存起來，不會啟動伺服器。下次啟動時就會套用這些設定。',
+    confirmRunning: '存好之後會重新啟動 Minecraft，約一分鐘內連不上。世界存檔不受影響。',
+    confirmPlayers: '有 {{n}} 人在線上，會被踢出去。',
+    confirmStopped: 'Minecraft 沒在執行，只會存起來，下次啟動時生效。',
     saveAndRestart: '儲存並重新啟動',
     values: {
       peaceful: '和平',
@@ -355,7 +354,7 @@ export default {
     language: '語言',
     launchAtLogin: '開機時自動啟動 CraftLift',
     launchAtLoginHint:
-      '開機時自動在背景啟動，縮在系統匣裡，需要時點一下就能管理伺服器。這不影響雲端上的伺服器——它會一直執行，跟這台電腦有沒有開機無關。',
+      '開機時縮在系統匣待命。跟雲端伺服器無關，它一直都在跑。',
     backupOnShutdown: '關機前自動把存檔備份到電腦',
     backupDir: '本機備份存放位置',
     defaultDir: '（預設：文件\\CraftLift Backups）',
@@ -390,9 +389,8 @@ export default {
       none: '（未登入）',
       signOut: '登出帳號',
       working: '登出中…',
-      note: '登出只會撤銷這台電腦上的登入憑證。你的伺服器、世界存檔與備份都留在 Google Cloud 上，重新登入同一個帳號就會全部回來。',
-      confirm:
-        '確定要登出嗎？畫面會回到一開始的設定步驟，要重新登入才能繼續管理伺服器。雲端上的東西不會被刪除。'
+      note: '登出只撤銷這台電腦上的憑證。伺服器與存檔都留在雲端，重新登入就回來。',
+      confirm: '登出後會回到設定畫面，要重新登入才能管理伺服器。雲端上的東西不會被刪除。'
     },
     danger: {
       title: '徹底清除',
