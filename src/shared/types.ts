@@ -232,7 +232,8 @@ export interface Transfer {
   /** 總位元組。0 代表算不出來，畫面要顯示成不確定進度而不是假裝 0%。 */
   totalBytes: number
   doneBytes: number
-  state: 'running' | 'done' | 'failed'
+  /** cancelled 跟 failed 分開：使用者自己按的不是錯誤，不該用紅字罵他 */
+  state: 'running' | 'paused' | 'done' | 'failed' | 'cancelled'
   error?: string
 }
 

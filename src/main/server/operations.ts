@@ -327,6 +327,30 @@ function sftpReaddir(sftp: SFTPWrapper, path: string): Promise<FileEntry[]> {
 /** 傳輸過程中回報已完成的位元組。不給也行，就是沒有進度可看。 */
 export type ProgressFn = (bytes: number) => void
 
+/** 讓呼叫端可以暫停／繼續／取消正在跑的這一段傳輸 */
+export interface TransferHooks {
+  onProgress?: ProgressFn
+  /** 串流準備好時交出遙控器。換一個檔案就會再呼叫一次。 */
+  attach?: (controls: { pause: () => void; resume: () => void; cancel: () => void } | null) => void
+}
+
+/**
+ * SFTP 傳輸的區塊大小與在途上限。
+ *
+ * 這兩個數字是整個傳輸速度的關鍵。SFTP 是一問一答的協定，吞吐量上限大約
+ * 是「同時在路上的資料量 ÷ 來回延遲」——ssh2 的 WriteStream 預設只讓 64KB
+ * 在路上，於是不管你的網路多快，實測就是每秒幾 MB，而且大半時間都在等
+ * 對方回應。
+ *
+ * 拉高 highWaterMark 之所以有效，是因為 ssh2 的 WriteStream 有實作 _writev：
+ * 緩衝區裡累積的區塊會被一次全部送出、平行等待。所以緩衝區越大，同時在
+ * 路上的請求就越多。這裡的 2MB／32KB 刻意跟 ssh2 自己的 fastPut 一致
+ * （64 個區塊 × 32KB），差別在於走串流我們才留得住暫停與取消——fastPut
+ * 沒有中途喊停的辦法。
+ */
+const CHUNK_BYTES = 32 * 1024
+const WINDOW_BYTES = 2 * 1024 * 1024
+
 /**
  * 送一個檔案到遠端。
  *
@@ -341,26 +365,57 @@ function uploadFile(
   sftp: SFTPWrapper,
   localPath: string,
   remotePath: string,
-  onProgress?: ProgressFn
+  hooks: TransferHooks = {}
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const source = createReadStream(localPath)
-    const sink = sftp.createWriteStream(remotePath)
+    // 本機讀 32KB 一塊，遠端那頭允許 2MB 在路上——於是最多約 64 個寫入
+    // 請求同時等待，而不是寫一塊等一塊
+    const source = createReadStream(localPath, { highWaterMark: CHUNK_BYTES })
+    const sink = sftp.createWriteStream(remotePath, { highWaterMark: WINDOW_BYTES })
+
     let settled = false
+    let cancelled = false
+    const cleanup = (): void => {
+      hooks.attach?.(null)
+      source.destroy()
+    }
     const fail = (err: Error): void => {
       if (settled) return
       settled = true
-      source.destroy()
+      cleanup()
       reject(err)
     }
     source.on('error', fail)
     sink.on('error', fail)
-    if (onProgress) source.on('data', (chunk: Buffer | string) => onProgress(chunk.length))
+    if (hooks.onProgress) {
+      source.on('data', (chunk: Buffer | string) => hooks.onProgress?.(chunk.length))
+    }
+
+    // 一定要等 'close'，不能只等 'finish'。'finish' 只代表本地這端把資料
+    // 全交出去了，SFTP 那邊還沒關閉遠端檔案代號、也還沒收到伺服器的確認；
+    // 這時候若把通道收掉，還在路上的寫入就這樣被丟掉——檔案越大未確認的
+    // 寫入越多，所以只有大檔會出事，而且不會有任何錯誤訊息。
     sink.on('close', () => {
       if (settled) return
       settled = true
-      resolve()
+      hooks.attach?.(null)
+      if (cancelled) reject(new Error('TRANSFER_CANCELLED'))
+      else resolve()
     })
+
+    hooks.attach?.({
+      pause: () => source.pause(),
+      resume: () => source.resume(),
+      cancel: () => {
+        cancelled = true
+        // 先把來源拆掉停止餵資料，再結束寫入端讓遠端檔案代號正常關閉。
+        // 直接砸掉寫入端會在伺服器上留一個沒關的代號。
+        source.unpipe(sink)
+        source.destroy()
+        sink.end()
+      }
+    })
+
     source.pipe(sink)
   })
 }
@@ -370,26 +425,47 @@ function downloadFile(
   sftp: SFTPWrapper,
   remotePath: string,
   localPath: string,
-  onProgress?: ProgressFn
+  hooks: TransferHooks = {}
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const source = sftp.createReadStream(remotePath)
+    // 下載這端 ssh2 的 ReadStream 是一次一個請求，沒有 _writev 那種批次
+    // 機制可以借力，但把每次請求拉大同樣能減少來回次數
+    const source = sftp.createReadStream(remotePath, { highWaterMark: WINDOW_BYTES })
     const sink = createWriteStream(localPath)
+
     let settled = false
+    let cancelled = false
     const fail = (err: Error): void => {
       if (settled) return
       settled = true
+      hooks.attach?.(null)
       source.destroy()
       reject(err)
     }
     source.on('error', fail)
     sink.on('error', fail)
-    if (onProgress) source.on('data', (chunk: Buffer | string) => onProgress(chunk.length))
+    if (hooks.onProgress) {
+      source.on('data', (chunk: Buffer | string) => hooks.onProgress?.(chunk.length))
+    }
     sink.on('close', () => {
       if (settled) return
       settled = true
-      resolve()
+      hooks.attach?.(null)
+      if (cancelled) reject(new Error('TRANSFER_CANCELLED'))
+      else resolve()
     })
+
+    hooks.attach?.({
+      pause: () => source.pause(),
+      resume: () => source.resume(),
+      cancel: () => {
+        cancelled = true
+        source.unpipe(sink)
+        source.destroy()
+        sink.end()
+      }
+    })
+
     source.pipe(sink)
   })
 }
@@ -399,16 +475,16 @@ async function uploadTree(
   sftp: SFTPWrapper,
   localDir: string,
   remoteDir: string,
-  onProgress?: ProgressFn
+  hooks: TransferHooks = {}
 ): Promise<void> {
   await sftpMkdir(sftp, remoteDir)
   for (const entry of await readdir(localDir, { withFileTypes: true })) {
     const local = join(localDir, entry.name)
     const remote = `${remoteDir}/${entry.name}`
     if (entry.isDirectory()) {
-      await uploadTree(sftp, local, remote, onProgress)
+      await uploadTree(sftp, local, remote, hooks)
     } else if (entry.isFile()) {
-      await uploadFile(sftp, local, remote, onProgress)
+      await uploadFile(sftp, local, remote, hooks)
     }
     // 捷徑與其他特殊檔案跳過——它們在遠端沒有意義
   }
@@ -437,7 +513,7 @@ export async function uploadPath(
   localPath: string,
   remotePath: string,
   replace = false,
-  onProgress?: ProgressFn
+  hooks: TransferHooks = {}
 ): Promise<void> {
   assertInServerDir(remotePath)
   const staging = stagingPath()
@@ -446,9 +522,9 @@ export async function uploadPath(
   try {
     await conn.withSftp(async (sftp) => {
       if (info.isDirectory()) {
-        await uploadTree(sftp, localPath, staging, onProgress)
+        await uploadTree(sftp, localPath, staging, hooks)
       } else {
-        await uploadFile(sftp, localPath, staging, onProgress)
+        await uploadFile(sftp, localPath, staging, hooks)
       }
     })
 
@@ -481,7 +557,7 @@ async function downloadTree(
   sftp: SFTPWrapper,
   remoteDir: string,
   localDir: string,
-  onProgress?: ProgressFn
+  hooks: TransferHooks = {}
 ): Promise<void> {
   await mkdir(localDir, { recursive: true })
   for (const entry of await sftpReaddir(sftp, remoteDir)) {
@@ -490,9 +566,9 @@ async function downloadTree(
     // SFTP 只給 POSIX 的 mode 位元，沒有現成的 isDirectory()。
     // 0o170000 是檔案類型那四個位元的遮罩，0o040000 就是「資料夾」。
     if ((entry.attrs.mode & 0o170000) === 0o040000) {
-      await downloadTree(sftp, remote, local, onProgress)
+      await downloadTree(sftp, remote, local, hooks)
     } else {
-      await downloadFile(sftp, remote, local, onProgress)
+      await downloadFile(sftp, remote, local, hooks)
     }
   }
 }
@@ -508,7 +584,7 @@ export async function downloadPath(
   conn: ServerConnection,
   remotePath: string,
   localPath: string,
-  onProgress?: ProgressFn,
+  hooks: TransferHooks = {},
   /** 總位元組。呼叫端想先知道要拉多少時傳進來收。 */
   onTotal?: (bytes: number) => void
 ): Promise<void> {
@@ -532,9 +608,9 @@ export async function downloadPath(
 
     await conn.withSftp(async (sftp) => {
       if (prep.stdout.includes('DIR')) {
-        await downloadTree(sftp, staging, localPath, onProgress)
+        await downloadTree(sftp, staging, localPath, hooks)
       } else {
-        await downloadFile(sftp, staging, localPath, onProgress)
+        await downloadFile(sftp, staging, localPath, hooks)
       }
     })
   } finally {

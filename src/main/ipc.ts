@@ -59,7 +59,15 @@ import {
   setPreferences
 } from './preferences'
 import { checkForUpdate, downloadUpdate, getUpdateState, installUpdate } from './updater'
-import { listTransfers, onTransfersChanged, startTransfer } from './transfers'
+import {
+  TransferCancelled,
+  cancelTransfer,
+  listTransfers,
+  onTransfersChanged,
+  pauseTransfer,
+  resumeTransfer,
+  startTransfer
+} from './transfers'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -151,6 +159,11 @@ function baseName(path: string): string {
  * 總量要等 downloadPath 問過遠端才知道，所以是一邊跑一邊補上去的——
  * 第一個檔案還在算大小的那一兩秒，畫面顯示的是不確定進度。
  */
+/** 取消是使用者自己按的，不是錯誤——兩者要分開，不然畫面會用紅字罵他 */
+function isCancellation(err: unknown): boolean {
+  return err instanceof TransferCancelled || (err instanceof Error && err.message === 'TRANSFER_CANCELLED')
+}
+
 async function runDownload(
   name: string,
   zone: string,
@@ -166,15 +179,26 @@ async function runDownload(
   try {
     await withConnection(name, zone, async (conn) => {
       for (const job of jobs) {
+        if (transfer.isCancelled()) throw new TransferCancelled()
         transfer.describe(baseName(job.remotePath))
-        await ops.downloadPath(conn, job.remotePath, job.localPath, transfer.advance, (bytes) => {
-          total += bytes
-          transfer.setTotal(total)
-        })
+        await ops.downloadPath(
+          conn,
+          job.remotePath,
+          job.localPath,
+          { onProgress: transfer.advance, attach: transfer.attach },
+          (bytes) => {
+            total += bytes
+            transfer.setTotal(total)
+          }
+        )
       }
     })
     transfer.done()
   } catch (err) {
+    if (isCancellation(err)) {
+      transfer.cancelled()
+      return
+    }
     transfer.fail(err instanceof Error ? err.message : String(err))
     throw err
   }
@@ -505,18 +529,21 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       try {
         await withConnection(name, zone, async (conn) => {
           for (const item of items) {
+            // 使用者在檔案與檔案之間按了取消，就不要再開始下一個
+            if (transfer.isCancelled()) throw new TransferCancelled()
             transfer.describe(baseName(item.remotePath))
-            await ops.uploadPath(
-              conn,
-              item.localPath,
-              item.remotePath,
-              item.replace,
-              transfer.advance
-            )
+            await ops.uploadPath(conn, item.localPath, item.remotePath, item.replace, {
+              onProgress: transfer.advance,
+              attach: transfer.attach
+            })
           }
         })
         transfer.done()
       } catch (err) {
+        if (isCancellation(err)) {
+          transfer.cancelled()
+          return
+        }
         transfer.fail(err instanceof Error ? err.message : String(err))
         throw err
       }
@@ -575,6 +602,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   // --- 傳輸進度 -------------------------------------------------------------
   // 狀態放在主行程，所以畫面切走再回來仍然看得到還在跑的那幾筆
   handle('transfer:list', async (): Promise<Transfer[]> => listTransfers())
+  handle('transfer:pause', async (id: string): Promise<void> => pauseTransfer(id))
+  handle('transfer:resume', async (id: string): Promise<void> => resumeTransfer(id))
+  handle('transfer:cancel', async (id: string): Promise<void> => cancelTransfer(id))
   onTransfersChanged((list) => getWindow()?.webContents.send('transfer:changed', list))
 
   // --- 備份 -----------------------------------------------------------------

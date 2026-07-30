@@ -23,12 +23,19 @@ export function Waiting(): React.JSX.Element {
  * percent 是 null 時代表總量還不知道（例如下載才剛開始、還在問遠端有多大），
  * 這時候讓格子跑動而不是停在 0%——停著會被當成卡住了。
  */
-export function Progress({ percent }: { percent: number | null }): React.JSX.Element {
+export function Progress({
+  percent,
+  frozen
+}: {
+  percent: number | null
+  /** 暫停中。總量還不知道時也不要讓格子跑動，那看起來像還在傳。 */
+  frozen?: boolean
+}): React.JSX.Element {
   const cells = 20
   const filled = percent === null ? 0 : Math.round((Math.min(100, Math.max(0, percent)) / 100) * cells)
   return (
     <span
-      className={`progress${percent === null ? ' unknown' : ''}`}
+      className={`progress${percent === null && !frozen ? ' unknown' : ''}`}
       role="progressbar"
       aria-valuenow={percent ?? undefined}
       aria-valuemin={0}
@@ -59,21 +66,50 @@ export function TransferRow({
   label,
   name,
   percent,
-  failed
+  tone = 'running',
+  onPause,
+  onResume,
+  onCancel,
+  pauseTitle,
+  resumeTitle,
+  cancelTitle
 }: {
   label: string
   name: string
   percent: number | null
-  failed?: boolean
+  tone?: 'running' | 'paused' | 'failed' | 'cancelled'
+  onPause?: () => void
+  onResume?: () => void
+  onCancel?: () => void
+  pauseTitle?: string
+  resumeTitle?: string
+  cancelTitle?: string
 }): React.JSX.Element {
+  const stopped = tone === 'failed' || tone === 'cancelled'
   return (
-    <span className={`transfer${failed ? ' failed' : ''}`}>
+    <span className={`transfer ${tone}`}>
       <span className="transfer-label">
         {label}
         {name && <span className="fact"> {name}</span>}
       </span>
-      <Progress percent={failed ? 100 : percent} />
-      {percent !== null && !failed && <span className="fact pct">{percent}%</span>}
+      {/* 暫停時進度條停在原地不動：不確定進度那種跑動的動畫會讓人以為還在傳 */}
+      <Progress percent={stopped ? 100 : percent} frozen={tone === 'paused'} />
+      {percent !== null && !stopped && <span className="fact pct">{percent}%</span>}
+      {onResume && (
+        <button type="button" className="icon-btn" title={resumeTitle} onClick={onResume}>
+          ▶
+        </button>
+      )}
+      {onPause && (
+        <button type="button" className="icon-btn" title={pauseTitle} onClick={onPause}>
+          ▮▮
+        </button>
+      )}
+      {onCancel && (
+        <button type="button" className="icon-btn" title={cancelTitle} onClick={onCancel}>
+          ✕
+        </button>
+      )}
     </span>
   )
 }

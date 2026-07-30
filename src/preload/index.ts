@@ -117,6 +117,11 @@ const api = {
   transfer: {
     /** 現在有哪些正在傳。畫面重新掛載時用這個補回進度。 */
     list: (): Promise<Result<Transfer[]>> => invoke('transfer:list'),
+    /** 暫停：停止餵資料，連線與遠端檔案代號都留著，隨時可以繼續 */
+    pause: (id: string): Promise<Result<void>> => invoke('transfer:pause', id),
+    resume: (id: string): Promise<Result<void>> => invoke('transfer:resume', id),
+    /** 取消。目的地那個檔案不會被動到——搬過去是在整份傳完之後才發生的。 */
+    cancel: (id: string): Promise<Result<void>> => invoke('transfer:cancel', id),
     onChange: (handler: (list: Transfer[]) => void): (() => void) => {
       const listener = (_e: unknown, list: Transfer[]): void => handler(list)
       ipcRenderer.on('transfer:changed', listener)

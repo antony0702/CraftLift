@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, ModFile, UploadItem } from '@shared/types'
 import { REMOTE } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
-import { completedKey, percentOf, useTransfers } from '../../lib/transfers'
-import { ErrorText, Loading, Modal, TransferRow, Waiting } from '../../components/Ui'
+import { completedKey, useTransfers } from '../../lib/transfers'
+import { ErrorText, Loading, Modal, Waiting } from '../../components/Ui'
+import Transfers from '../../components/Transfers'
 
 /**
  * 模組分頁。
@@ -56,6 +57,14 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
+  /**
+   * 說明性的訊息（略過了幾個非 .jar 之類），跟錯誤分開放。
+   *
+   * 混在一起會有兩個問題：它會被畫成紅字，像是使用者做錯了什麼；而且
+   * 重讀清單時會被一起清掉——傳輸完成後本來就會重讀一次，於是「有 N 個
+   * 被略過」在剛出現的那一瞬間就被抹掉了。
+   */
+  const [notice, setNotice] = useState('')
   const [saved, setSaved] = useState('')
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -137,6 +146,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   const run = async (label: string, fn: () => Promise<void>): Promise<void> => {
     setBusy(label)
     setMessage('')
+    setNotice('')
     setSaved('')
     try {
       await fn()
@@ -241,7 +251,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
     const jars = localPaths.filter((p) => p.toLowerCase().endsWith('.jar'))
     const rejected = localPaths.length - jars.length
     if (jars.length === 0) {
-      if (rejected > 0) setMessage(t('mods.onlyJar'))
+      if (rejected > 0) setNotice(t('mods.onlyJar'))
       return
     }
     await run(t('mods.busy.upload'), async () => {
@@ -259,7 +269,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
       await load()
       setSelected(new Set(items.map((i) => i.remotePath)))
       // 有東西被濾掉時仍然要講，不然使用者會以為全部都上傳了
-      if (rejected > 0) setMessage(t('mods.someSkipped', { count: rejected }))
+      if (rejected > 0) setNotice(t('mods.someSkipped', { count: rejected }))
     })
   }
 
@@ -489,6 +499,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
       )}
 
       <ErrorText>{message}</ErrorText>
+      {notice && <p className="muted small">{notice}</p>}
       {saved && (
         <p className="small">
           <span className="fact">{saved}</span>{' '}
@@ -591,15 +602,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
           </span>
         )}
         <div className="grow" />
-        {transfers.map((job) => (
-          <TransferRow
-            key={job.id}
-            label={t(job.kind === 'upload' ? 'mods.busy.upload' : 'mods.busy.download')}
-            name={job.label}
-            percent={percentOf(job)}
-            failed={job.state === 'failed'}
-          />
-        ))}
+        <Transfers transfers={transfers} />
         {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}

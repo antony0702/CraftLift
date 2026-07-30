@@ -263,6 +263,18 @@ export default {
     commandPlaceholder: 'Type a command, e.g. time set day',
     send: 'Send'
   },
+  transfer: {
+    pause: 'Pause',
+    resume: 'Resume',
+    cancel: 'Cancel',
+    /* One complete phrase per state rather than gluing words together */
+    upload: 'Uploading',
+    download: 'Downloading',
+    uploadPaused: 'Upload paused',
+    downloadPaused: 'Download paused',
+    uploadCancelled: 'Upload cancelled',
+    downloadCancelled: 'Download cancelled'
+  },
   files: {
     notEditable: 'This is not a text file, so it cannot be opened in the built-in editor. Download it instead.',
     root: 'Server',

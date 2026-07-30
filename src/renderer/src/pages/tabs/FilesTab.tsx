@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, RemoteFile, TransferItem, UploadItem } from '@shared/types'
 import { REMOTE } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
-import { completedKey, percentOf, useTransfers } from '../../lib/transfers'
-import { ErrorText, Loading, Modal, TransferRow, Waiting } from '../../components/Ui'
+import { completedKey, useTransfers } from '../../lib/transfers'
+import { ErrorText, Loading, Modal, Waiting } from '../../components/Ui'
+import Transfers from '../../components/Transfers'
 
 /**
  * 檔案分頁。
@@ -822,15 +823,7 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
         <div className="grow" />
         {/* 傳輸有自己的進度條；其餘操作（刪除、改名、貼上）沒有可量的進度，
             繼續用逐格等待指示 */}
-        {transfers.map((job) => (
-          <TransferRow
-            key={job.id}
-            label={t(job.kind === 'upload' ? 'files.busy.upload' : 'files.busy.download')}
-            name={job.label}
-            percent={percentOf(job)}
-            failed={job.state === 'failed'}
-          />
-        ))}
+        <Transfers transfers={transfers} />
         {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}

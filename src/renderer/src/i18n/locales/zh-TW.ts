@@ -248,6 +248,19 @@ export default {
     commandPlaceholder: '輸入指令，例如 time set day',
     send: '送出'
   },
+  transfer: {
+    pause: '暫停',
+    resume: '繼續',
+    cancel: '取消',
+    /* 每個狀態各自一句完整的話。用「已暫停」＋「正在上傳」拼起來會變成
+       「已暫停正在上傳」——組字串在中文裡幾乎都會出這種事。 */
+    upload: '正在上傳',
+    download: '正在下載',
+    uploadPaused: '已暫停上傳',
+    downloadPaused: '已暫停下載',
+    uploadCancelled: '已取消上傳',
+    downloadCancelled: '已取消下載'
+  },
   files: {
     notEditable: '這個檔案不是文字檔，無法用內建編輯器開啟。你可以下載回電腦再處理。',
     root: '伺服器',

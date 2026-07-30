@@ -1227,6 +1227,23 @@ button.danger:hover:not(:disabled) {
 .transfer.failed .pct {
   color: var(--ember);
 }
+/* 取消是使用者自己按的，不是出錯，所以不用警示色，只是變暗 */
+.transfer.cancelled .transfer-label {
+  color: var(--dust);
+  opacity: 0.6;
+}
+/* 暫停與取消的按鈕。放在進度條後面，不要比進度條本身還顯眼。 */
+.transfer .icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--dust);
+}
+.transfer .icon-btn:hover:not(:disabled) {
+  color: var(--bone);
+}
 .progress {
   display: inline-flex;
   gap: 2px;
@@ -1241,6 +1258,13 @@ button.danger:hover:not(:disabled) {
 }
 .transfer.failed .progress i {
   background: var(--ember);
+}
+/* 暫停：已完成的部分退成石頭色，一眼看得出「停著」而不是「還在跑」 */
+.transfer.paused .progress i.on {
+  background: var(--dust);
+}
+.transfer.cancelled .progress i {
+  background: var(--edge);
 }
 /* 總量還不知道的時候：格子輪流亮，講「在動，只是還說不出剩多少」。
    停在 0% 會被當成卡住了。 */
