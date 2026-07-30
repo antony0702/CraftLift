@@ -245,8 +245,19 @@ export default {
     restartHint: '存檔後需要重新啟動 Minecraft 才會生效。'
   },
   props: {
-    restartNote: '修改後需要在「主控台」按下「重新啟動」才會生效。',
+    restartNote:
+      '這些設定只有在 Minecraft 啟動時才會被讀取，所以改完必須重新啟動才會生效。按下儲存時 CraftLift 會問你，確認後就直接幫你重啟。',
     saved: '已儲存',
+    checking: '確認狀態中…',
+    restarting: '重新啟動中…',
+    confirmTitle: '儲存並重新啟動',
+    confirmTitleStopped: '儲存設定',
+    confirmRunning:
+      '設定會先存回伺服器，接著重新啟動 Minecraft 讓它生效。重啟大約需要十幾秒到一分鐘，這段期間伺服器連不上。世界存檔不會受影響。',
+    confirmPlayers: '目前有 {{n}} 位玩家在線上，他們會被踢出去。',
+    confirmStopped:
+      'Minecraft 目前沒有在執行，所以只會把設定存起來，不會啟動伺服器。下次啟動時就會套用這些設定。',
+    saveAndRestart: '儲存並重新啟動',
     values: {
       peaceful: '和平',
       easy: '簡單',

@@ -255,8 +255,19 @@ export default {
     restartHint: 'Restart Minecraft for changes to take effect.'
   },
   props: {
-    restartNote: 'Press “Restart” on the Console tab for changes to take effect.',
+    restartNote:
+      'These settings are only read when Minecraft starts, so a restart is required for changes to take effect. CraftLift asks you when you press Save, and restarts for you once you confirm.',
     saved: 'Saved',
+    checking: 'Checking status…',
+    restarting: 'Restarting…',
+    confirmTitle: 'Save and restart',
+    confirmTitleStopped: 'Save settings',
+    confirmRunning:
+      'The settings are written to the server, then Minecraft is restarted so they take effect. A restart takes anywhere from ten seconds to a minute, during which the server is unreachable. Your world is not affected.',
+    confirmPlayers: '{{n}} player(s) are online right now and will be disconnected.',
+    confirmStopped:
+      'Minecraft is not currently running, so the settings are only saved — the server will not be started. They will apply the next time it starts.',
+    saveAndRestart: 'Save and restart',
     values: {
       peaceful: 'Peaceful',
       easy: 'Easy',
