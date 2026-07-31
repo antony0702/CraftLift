@@ -94,7 +94,10 @@ export interface Loader {
 
 export const LOADERS: Loader[] = [
   { id: 'fabric', minMcVersion: '1.14' },
-  { id: 'neoforge', minMcVersion: '1.20.1' },
+  // NeoForge 的 1.20.1 是掛在另一個 Maven artifact（net.neoforged:forge，
+  // 當時還是 Forge 的分支）底下，我們查的 net.neoforged:neoforge 最早只到
+  // 1.20.2。寫 1.20.1 的話清單上選得到、按下去卻必定查無版本。
+  { id: 'neoforge', minMcVersion: '1.20.2' },
   { id: 'forge', minMcVersion: '1.7.10' }
 ]
 

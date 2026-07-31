@@ -70,13 +70,26 @@ function versionsFromMavenMetadata(xml: string): string[] {
 /**
  * NeoForge 的版本號前綴。
  *
- * 它不用 Minecraft 的版本號，而是把 1.21.4 對應成 21.4.x——主版號取
- * Minecraft 的次版號，次版號取修訂號，沒有修訂號時是 0（1.21 → 21.0.x）。
+ * 它不用 Minecraft 的版本號，而且對應規則在 Minecraft 改用日期式版號
+ * （1.21.11 之後接 26.1）時換過一次：
+ *   1.21.4 → 21.4.x   —— 丟掉開頭的 1，主版號取次版號、次版號取修訂號，
+ *                        沒有修訂號時是 0（1.21 → 21.0.x）
+ *   26.2   → 26.2.0.x —— 直接用 Minecraft 的版本號，補滿三段
+ *   26.1.2 → 26.1.2.x
+ * 最後那一段都是 NeoForge 自己的建置編號。
  */
 function neoforgePrefix(mcVersion: string): string {
-  const [, minor, patch] = mcVersion.split('.')
+  const parts = mcVersion.split('.')
+
+  if (parts[0] === '1') {
+    const [, minor, patch] = parts
+    if (!minor) throw new Error(`看不懂的 Minecraft 版本：${mcVersion}`)
+    return `${minor}.${patch ?? '0'}.`
+  }
+
+  const [major, minor, patch] = parts
   if (!minor) throw new Error(`看不懂的 Minecraft 版本：${mcVersion}`)
-  return `${minor}.${patch ?? '0'}.`
+  return `${major}.${minor}.${patch ?? '0'}.`
 }
 
 interface FabricLoaderEntry {
