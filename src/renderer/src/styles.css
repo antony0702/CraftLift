@@ -1041,6 +1041,49 @@ button.danger:hover:not(:disabled) {
   margin: 22px 0;
 }
 
+/* ── 模組 ─────────────────────────────────────────────────────
+   載入器的三張卡片沿用方案卡片的版面。它們是同一件事——「挑一個，
+   每個附一句話說明差別」——沒有理由發明第二種樣子。 */
+.loader-choice {
+  margin: 11px 0 22px;
+}
+.loader-choice .notice {
+  margin: 11px 0 0;
+}
+/* 模組分頁沿用 .files 那整套（清單、狀態列、右鍵選單），只多這三條 */
+.mods {
+  /* 清單短的時候也要留得下拖放的落點 */
+  min-height: 264px;
+}
+/* 拖著檔案經過。用光的顏色講「東西會掉進這裡」，跟檔案總管同一個講法。 */
+.mods.dropping {
+  box-shadow:
+    inset 0 1px 0 var(--torch),
+    inset 0 -1px 0 var(--torch);
+}
+/* 停用的模組變淡。檔案總管裡「已剪下」也是這樣講——東西還在，但現在不算數。
+   勾選欄不跟著變淡：那是唯一能把它開回來的東西，畫成半透明看起來就像
+   按不下去。 */
+.mods .files-table .row.off td:not(.tick) {
+  opacity: 0.45;
+}
+/* 勾選欄。寬度貼著方塊本身，不要讓它把檔名欄擠掉。 */
+.files-table .tick {
+  width: 22px;
+  padding-right: 0;
+}
+.files-table .tick input {
+  width: auto;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--torch);
+}
+/* 「這個檔案載入器不會讀」——比一般說明更需要被看見，但還不到錯誤 */
+.warn {
+  color: var(--ember);
+  font-size: 11px;
+}
+
 /* ── 費用估算 ───────────────────────────────────────────────── */
 .estimate {
   border: 1px solid var(--edge);
@@ -1159,6 +1202,147 @@ button.danger:hover:not(:disabled) {
   resize: vertical;
   white-space: pre;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── 進度條 ───────────────────────────────────────────────────
+   離散的格子，不是連續的長條。這套介面的等待指示與方塊底下的光池都是
+   分階的，一條平滑漸變的進度條會是整個畫面裡唯一一個連續的東西。
+   格子亮起來用的是光的顏色——那是這裡少數該出現橘色的位置。 */
+.transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  white-space: nowrap;
+}
+.transfer-label {
+  color: var(--dust);
+}
+.transfer .pct {
+  color: var(--dust);
+  /* 數字從個位數變成三位數時不要讓整條往旁邊跳 */
+  min-width: 33px;
+  text-align: right;
+}
+.transfer.failed .transfer-label,
+.transfer.failed .pct {
+  color: var(--ember);
+}
+/* 取消是使用者自己按的，不是出錯，所以不用警示色，只是變暗 */
+.transfer.cancelled .transfer-label {
+  color: var(--dust);
+  opacity: 0.6;
+}
+/* 暫停與取消的按鈕。放在進度條後面，不要比進度條本身還顯眼。 */
+.transfer .icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  color: var(--dust);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.transfer .icon-btn:hover:not(:disabled) {
+  color: var(--bone);
+}
+/* 叉叉用字元就夠了，但要夠粗才跟旁邊畫出來的圖示壓得住同樣的份量 */
+.transfer .cancel-btn {
+  font-size: 11px;
+  font-weight: 700;
+}
+/* 暫停與繼續用畫的。方塊與三角形的文字符號寬高由字型決定，在 11px 的
+   格線上一定歪；畫出來的才對得準，邊也才是硬的。 */
+.glyph-btn i {
+  display: block;
+}
+.ic-pause {
+  width: 9px;
+  height: 9px;
+  /* 兩條 3px 的直條，中間留 3px。用 box-shadow 畫第二條，省一個節點。 */
+  background: currentColor;
+  box-shadow: 6px 0 0 currentColor;
+  width: 3px;
+}
+.ic-play {
+  /* 邊框畫的三角形：左邊實心、上下透明，就是一個朝右的箭頭 */
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid currentColor;
+  /* 三角形的視覺重心偏左，往右推一點才會落在按鈕正中央 */
+  margin-left: 2px;
+}
+.progress {
+  display: inline-flex;
+  gap: 2px;
+}
+.progress i {
+  width: 5px;
+  height: 11px;
+  background: var(--edge);
+}
+.progress i.on {
+  background: var(--torch);
+}
+.transfer.failed .progress i {
+  background: var(--ember);
+}
+/* 暫停：已完成的部分退成石頭色，一眼看得出「停著」而不是「還在跑」 */
+.transfer.paused .progress i.on {
+  background: var(--dust);
+}
+.transfer.cancelled .progress i {
+  background: var(--edge);
+}
+/* 總量還不知道的時候：格子輪流亮，講「在動，只是還說不出剩多少」。
+   停在 0% 會被當成卡住了。 */
+.progress.unknown i {
+  animation: sweep 1.4s steps(1) infinite;
+}
+.progress.unknown i:nth-child(4n + 2) {
+  animation-delay: 0.35s;
+}
+.progress.unknown i:nth-child(4n + 3) {
+  animation-delay: 0.7s;
+}
+.progress.unknown i:nth-child(4n) {
+  animation-delay: 1.05s;
+}
+@keyframes sweep {
+  0%,
+  24% {
+    background: var(--torch);
+  }
+  25%,
+  100% {
+    background: var(--edge);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress.unknown i {
+    animation: none;
+  }
+}
+
+/* ── 備份分類 ─────────────────────────────────────────────────
+   世界與伺服器設定是兩種不同的東西，分開列，使用者才不用讀檔名分辨 */
+.backup-group {
+  margin-top: 33px;
+}
+.backup-group h3 {
+  font-size: 11px;
+  font-weight: normal;
+  margin: 0;
+  color: var(--bone);
+}
+/* 每一區的標題與自己的備份按鈕同一列 */
+.backup-group .toolbar {
+  margin-bottom: 0;
+}
+.backup-group p {
+  margin: 0 0 11px;
 }
 
 /* ── 等待：逐格四階，跟光同一套語言 ─────────────────────────── */

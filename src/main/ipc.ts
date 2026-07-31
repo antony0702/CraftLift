@@ -6,15 +6,19 @@ import type {
   BillingAccount,
   CreateServerOptions,
   FeedbackInput,
+  LoaderVersion,
   MachineType,
   McVersion,
   MinecraftServer,
+  ModLoader,
+  ModsListing,
   PlayerLists,
   Preferences,
   PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties,
+  Transfer,
   TransferItem,
   UpdateState,
   UploadItem
@@ -42,6 +46,8 @@ import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
 import { estimatePrice } from './gcloud/pricing'
 import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
+import { listLoaderVersions, resolveFabricApi, resolveLoaderInstall } from './loaders'
+import type { LoaderInstall } from './loaders'
 import { buildStartupScript } from './server/startupScript'
 import { closeAllConnections, closeConnection, getConnection } from './server/ssh'
 import type { ServerConnection } from './server/ssh'
@@ -53,6 +59,15 @@ import {
   setPreferences
 } from './preferences'
 import { checkForUpdate, downloadUpdate, getUpdateState, installUpdate } from './updater'
+import {
+  TransferCancelled,
+  cancelTransfer,
+  listTransfers,
+  onTransfersChanged,
+  pauseTransfer,
+  resumeTransfer,
+  startTransfer
+} from './transfers'
 
 /**
  * 目前使用中的 GCP 專案。
@@ -131,6 +146,62 @@ function handle<Args extends unknown[], T>(
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+}
+
+/** 遠端路徑的最後一段，拿來當進度條上的說明 */
+function baseName(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path
+}
+
+/**
+ * 跑一批下載，並登記成一筆看得到進度的傳輸。
+ *
+ * 總量要等 downloadPath 問過遠端才知道，所以是一邊跑一邊補上去的——
+ * 第一個檔案還在算大小的那一兩秒，畫面顯示的是不確定進度。
+ */
+/** 取消是使用者自己按的，不是錯誤——兩者要分開，不然畫面會用紅字罵他 */
+function isCancellation(err: unknown): boolean {
+  return err instanceof TransferCancelled || (err instanceof Error && err.message === 'TRANSFER_CANCELLED')
+}
+
+async function runDownload(
+  name: string,
+  zone: string,
+  jobs: Array<{ remotePath: string; localPath: string }>
+): Promise<void> {
+  const transfer = startTransfer({
+    kind: 'download',
+    server: name,
+    label: baseName(jobs[0]?.remotePath ?? ''),
+    totalBytes: 0
+  })
+  let total = 0
+  try {
+    await withConnection(name, zone, async (conn) => {
+      for (const job of jobs) {
+        if (transfer.isCancelled()) throw new TransferCancelled()
+        transfer.describe(baseName(job.remotePath))
+        await ops.downloadPath(
+          conn,
+          job.remotePath,
+          job.localPath,
+          { onProgress: transfer.advance, attach: transfer.attach },
+          (bytes) => {
+            total += bytes
+            transfer.setTotal(total)
+          }
+        )
+      }
+    })
+    transfer.done()
+  } catch (err) {
+    if (isCancellation(err)) {
+      transfer.cancelled()
+      return
+    }
+    transfer.fail(err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 /** 每台伺服器目前的日誌串流停止函式 */
@@ -217,21 +288,47 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   )
   handle('mc:latest', latestRelease)
 
+  // --- 模組載入器版本 -------------------------------------------------------
+  handle(
+    'loader:versions',
+    async (loader: ModLoader, mcVersion: string): Promise<LoaderVersion[]> =>
+      listLoaderVersions(loader, mcVersion)
+  )
+
   // --- 伺服器（GCP 層）------------------------------------------------------
   handle('server:list', async (): Promise<MinecraftServer[]> => listServers(await requireProject()))
 
   handle('server:create', async (opts: CreateServerOptions): Promise<MinecraftServer> => {
     const projectId = await requireProject()
+    // Fabric 用不到 Mojang 的 server.jar（它自己會抓），但這一趟仍然要跑——
+    // 這個 Minecraft 版本需要哪個 Java 版本只有 Mojang 說得準
     const jar = await getServerJarInfo(opts.mcVersion)
     const prefs = await getPreferences()
+
+    // 版本在這裡才定案：畫面送空字串代表「交給 CraftLift 挑」。
+    // 定案的結果要寫進機器的 metadata，否則之後查不出裝的是哪一版。
+    let loader: LoaderInstall | null = null
+    let fabricApi: { fileName: string; url: string } | null = null
+    if (opts.flavor !== 'vanilla') {
+      loader = await resolveLoaderInstall(opts.flavor, opts.mcVersion, opts.loaderVersion)
+      // Fabric 的載入器不含 API，絕大多數模組都要它。查不到就讓建立失敗——
+      // 這是一趟 HTTP，重試一次比拿到一台每個模組都裝不起來的伺服器好。
+      if (opts.flavor === 'fabric') {
+        fabricApi = await resolveFabricApi(opts.mcVersion)
+      }
+    }
+
     const script = buildStartupScript({
       serverJarUrl: jar.url,
       javaMajorVersion: jar.javaMajorVersion,
       // JVM 記憶體依實際選到的機器規格換算，不再綁定固定方案
       jvmHeap: jvmHeapFor(opts.memoryGb),
-      backupIntervalHours: prefs.backupIntervalHours
+      backupIntervalHours: prefs.backupIntervalHours,
+      flavor: opts.flavor,
+      loader: loader ? { kind: loader.kind, url: loader.url } : null,
+      fabricApi
     })
-    return createServer(projectId, opts, script)
+    return createServer(projectId, opts, script, loader?.version ?? null)
   })
 
   // --- 機型與價格 -----------------------------------------------------------
@@ -267,10 +364,36 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
         const conn = await getConnection(projectId, name, zone)
         await ops.createBackup(conn)
         const backups = await ops.listBackups(conn)
-        if (backups[0]) {
-          const dir = prefs.localBackupDir ?? defaultLocalBackupDir()
-          await mkdir(dir, { recursive: true })
-          await ops.downloadPath(conn, backups[0].path, join(dir, backups[0].fileName))
+        const dir = prefs.localBackupDir ?? defaultLocalBackupDir()
+        await mkdir(dir, { recursive: true })
+
+        // 兩包分開挑。以前這裡拿的是 backups[0]，現在備份資料夾裡除了
+        // 世界還有模組與設定，照時間拿最新的那個會變成「有時候帶回世界、
+        // 有時候帶回模組」——而使用者完全看不出來少了哪一份。
+        const newest = (prefix: string): (typeof backups)[number] | undefined =>
+          backups.find((b) => b.fileName.startsWith(prefix))
+
+        for (const prefix of ['world-', 'setup-']) {
+          const target = newest(prefix)
+          if (!target) continue
+          const localPath = join(dir, target.fileName)
+          // 一包失敗不能拖累另一包。世界很大、比較容易在傳輸中途斷掉，
+          // 而模組那包才是「到期之後想重建伺服器」真正需要的東西——
+          // 讓前者的失敗把後者一起吃掉，等於整個設計白做。
+          try {
+            // 模組那一包只有內容變了才會產生新檔名，所以本機已經有同一份
+            // 就不用再傳一次——幾百 MB 走 SFTP 要好幾分鐘，而使用者正在
+            // 等關機完成。
+            await access(localPath)
+            continue
+          } catch {
+            // 本機還沒有，往下傳
+          }
+          try {
+            await ops.downloadPath(conn, target.path, localPath)
+          } catch {
+            // 記不下來也要繼續下一包
+          }
         }
       } catch {
         // 忽略：備份失敗不應該讓使用者關不了機
@@ -388,11 +511,42 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   handle(
     'files:upload',
     async (name: string, zone: string, items: UploadItem[]): Promise<void> => {
-      await withConnection(name, zone, async (conn) => {
-        for (const item of items) {
-          await ops.uploadPath(conn, item.localPath, item.remotePath, item.replace)
+      // 總量先算出來才畫得出進度條。這是本機的 stat，很快。
+      let totalBytes = 0
+      for (const item of items) {
+        try {
+          totalBytes += await ops.localSize(item.localPath)
+        } catch {
+          // 算不出來就算了，畫面會顯示成不確定進度
         }
+      }
+      const transfer = startTransfer({
+        kind: 'upload',
+        server: name,
+        label: baseName(items[0]?.remotePath ?? ''),
+        totalBytes
       })
+      try {
+        await withConnection(name, zone, async (conn) => {
+          for (const item of items) {
+            // 使用者在檔案與檔案之間按了取消，就不要再開始下一個
+            if (transfer.isCancelled()) throw new TransferCancelled()
+            transfer.describe(baseName(item.remotePath))
+            await ops.uploadPath(conn, item.localPath, item.remotePath, item.replace, {
+              onProgress: transfer.advance,
+              attach: transfer.attach
+            })
+          }
+        })
+        transfer.done()
+      } catch (err) {
+        if (isCancellation(err)) {
+          transfer.cancelled()
+          return
+        }
+        transfer.fail(err instanceof Error ? err.message : String(err))
+        throw err
+      }
     }
   )
 
@@ -417,7 +571,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
           })
           if (picked.canceled || !picked.filePath) return null
           const target = picked.filePath
-          await withConnection(name, zone, (conn) => ops.downloadPath(conn, single, target))
+          await runDownload(name, zone, [{ remotePath: single, localPath: target }])
           return target
         }
       }
@@ -428,12 +582,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       if (picked.canceled || !picked.filePaths[0]) return null
       const dir = picked.filePaths[0]
 
-      await withConnection(name, zone, async (conn) => {
-        for (const remotePath of remotePaths) {
-          const target = await freeLocalPath(dir, remotePath.split('/').pop() as string)
-          await ops.downloadPath(conn, remotePath, target)
-        }
-      })
+      const jobs: Array<{ remotePath: string; localPath: string }> = []
+      for (const remotePath of remotePaths) {
+        jobs.push({
+          remotePath,
+          localPath: await freeLocalPath(dir, remotePath.split('/').pop() as string)
+        })
+      }
+      await runDownload(name, zone, jobs)
       return dir
     }
   )
@@ -443,12 +599,60 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     shell.showItemInFolder(localPath)
   })
 
+  // --- 傳輸進度 -------------------------------------------------------------
+  // 狀態放在主行程，所以畫面切走再回來仍然看得到還在跑的那幾筆
+  handle('transfer:list', async (): Promise<Transfer[]> => listTransfers())
+  handle('transfer:pause', async (id: string): Promise<void> => pauseTransfer(id))
+  handle('transfer:resume', async (id: string): Promise<void> => resumeTransfer(id))
+  handle('transfer:cancel', async (id: string): Promise<void> => cancelTransfer(id))
+  onTransfersChanged((list) => getWindow()?.webContents.send('transfer:changed', list))
+
   // --- 備份 -----------------------------------------------------------------
+  // --- 模組 -----------------------------------------------------------------
+  /**
+   * 這裡只有兩個口。模組的上傳、刪除、下載，以及「停用」（把副檔名改成
+   * .disabled）全部走 files:* 那幾條已經驗過的路——它們本來就是同一件事，
+   * 而且那邊已經有路徑逃逸防護。
+   */
+  handle('mods:list', async (name: string, zone: string): Promise<ModsListing> =>
+    withConnection(name, zone, (conn) => ops.listMods(conn))
+  )
+
+  /** 只顯示 .jar 的檔案選擇視窗。選檔與上傳分開，畫面才能夾在中間問撞名。 */
+  handle('mods:pick', async (): Promise<string[]> => {
+    const window = getWindow()
+    if (!window) return []
+    const picked = await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Minecraft mod', extensions: ['jar'] }]
+    })
+    return picked.canceled ? [] : picked.filePaths
+  })
+
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>
     withConnection(name, zone, ops.listBackups)
   )
-  handle('backup:create', async (name: string, zone: string): Promise<string> =>
-    withConnection(name, zone, ops.createBackup)
+  /**
+   * 立刻備份。
+   *
+   * 登記成一筆 backup，理由跟上傳下載一樣：打包一個世界要好幾分鐘，而
+   * 使用者這段期間會切分頁。狀態若只活在備份分頁的元件裡，切走一次就
+   * 消失，回來會看到一份還在寫的壓縮檔配上一顆可以按的下載按鈕——
+   * 那會下載到不完整的檔案。
+   */
+  handle(
+    'backup:create',
+    async (name: string, zone: string, kind: 'world' | 'setup' | 'all' = 'all'): Promise<string> => {
+      const job = startTransfer({ kind: 'backup', server: name, label: kind, totalBytes: 0 })
+      try {
+        const out = await withConnection(name, zone, (conn) => ops.createBackup(conn, kind))
+        job.done()
+        return out
+      } catch (err) {
+        job.fail(err instanceof Error ? err.message : String(err))
+        throw err
+      }
+    }
   )
   handle('backup:setInterval', async (name: string, zone: string, hours: number): Promise<void> => {
     await setPreferences({ backupIntervalHours: hours })

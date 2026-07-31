@@ -122,6 +122,25 @@ export default {
         '以上為概略估算，僅供比較不同規格時參考。實際費用一律以 Google 的帳單為準，CraftLift 不對估算的準確性負責。估算不含網路流量費用，也不含任何折扣或免費額度。'
     },
     version: 'Minecraft 版本',
+    flavor: '伺服器類型',
+    vanilla: '原版',
+    modded: '模組',
+    loaders: {
+      fabric: { name: 'Fabric', desc: '輕量，更新最快' },
+      neoforge: { name: 'NeoForge', desc: '1.20.2 之後的主流' },
+      forge: { name: 'Forge', desc: '老模組最多' }
+    },
+    loaderNeeds: '需要 Minecraft {{version}} 以上',
+    loaderTooOld:
+      '{{loader}} 沒有搭配 Minecraft {{version}} 的版本。請換一個載入器，或把上面的版本調高。',
+    loaderVersion: '載入器版本',
+    loaderVersionHint: '不確定就用建議版本。指定舊版通常是為了配合只支援那一版的模組。',
+    loaderRecommended: '建議版本（最新正式版）',
+    loaderBeta: '測試版',
+    loaderLoading: '讀取版本清單中…',
+    loaderUnavailable: '讀不到版本清單，建立時會自動採用建議版本。',
+    moddedNote: '玩家的 Minecraft 也要裝同一個載入器與同一份模組，才連得進來。',
+    moddedMemory: '模組很吃記憶體，建議至少 {{gb}} GB。',
     showAdvanced: '顯示進階設定',
     hideAdvanced: '收起進階設定',
     zone: '機房位置',
@@ -154,6 +173,7 @@ export default {
     boot: '開機',
     delete: '刪除伺服器',
     version: '版本',
+    loader: '載入器',
     machine: '機器',
     zone: '機房',
     shutdownNote: '按下關機時，CraftLift 會先自動備份並把存檔帶回你的電腦，再把機器關掉。',
@@ -163,9 +183,51 @@ export default {
       console: '主控台',
       properties: '伺服器設定',
       players: '玩家管理',
+      mods: '模組',
       files: '檔案',
       backups: '備份'
     }
+  },
+  mods: {
+    count: '{{count}} 個模組',
+    disabledCount: '{{count}} 個已停用',
+    upload: '上傳模組',
+    onlyJar: '模組必須是 .jar 檔。',
+    someSkipped: '有 {{count}} 個不是 .jar，已略過。',
+    restartNote: '模組在 Minecraft 啟動時才會載入。',
+    needRestart: '模組已變更，重新啟動 Minecraft 才會生效。',
+    restartNow: '重新啟動',
+    restarting: '重新啟動中…',
+    confirmRestart: 'Minecraft 會重新啟動，約一分鐘內連不上。世界存檔不受影響。',
+    confirmPlayers: '有 {{n}} 人在線上，會被踢出去。',
+    on: '啟用中',
+    off: '已停用',
+    enable: '啟用',
+    disable: '停用',
+    empty: '還沒有任何模組。把 .jar 檔從電腦拖進來就會上傳。',
+    badExtension: '（副檔名不是小寫 .jar，Fabric 不會載入）',
+    detailsFileName: '檔名',
+    columns: {
+      name: '模組',
+      modified: '修改日期',
+      state: '狀態',
+      size: '大小'
+    },
+    menu: {
+      upload: '上傳模組……'
+    },
+    busy: {
+      /* 進度條旁邊的說明，後面會接一條進度條，所以不用刪節號 */
+      upload: '正在上傳',
+      download: '正在下載',
+      delete: '正在刪除……',
+      enable: '正在啟用……',
+      disable: '正在停用……',
+      checking: '確認中…'
+    },
+    confirmDeleteTitle: '刪除模組',
+    confirmDelete: '確定要刪除這 {{count}} 個模組嗎？',
+    confirmDeleteNote: '刪掉就要重新下載。只是想暫時關掉的話用「停用」。'
   },
   console: {
     machineOff: '機器目前沒有執行',
@@ -185,6 +247,19 @@ export default {
     noLog: '（還沒有日誌）',
     commandPlaceholder: '輸入指令，例如 time set day',
     send: '送出'
+  },
+  transfer: {
+    pause: '暫停',
+    resume: '繼續',
+    cancel: '取消',
+    /* 每個狀態各自一句完整的話。用「已暫停」＋「正在上傳」拼起來會變成
+       「已暫停正在上傳」——組字串在中文裡幾乎都會出這種事。 */
+    upload: '正在上傳',
+    download: '正在下載',
+    uploadPaused: '已暫停上傳',
+    downloadPaused: '已暫停下載',
+    uploadCancelled: '已取消上傳',
+    downloadCancelled: '已取消下載'
   },
   files: {
     notEditable: '這個檔案不是文字檔，無法用內建編輯器開啟。你可以下載回電腦再處理。',
@@ -224,8 +299,9 @@ export default {
     },
     busy: {
       open: '正在開啟……',
-      upload: '正在上傳……',
-      download: '正在下載……',
+      /* 這兩個後面會接一條進度條，所以不用刪節號 */
+      upload: '正在上傳',
+      download: '正在下載',
       delete: '正在刪除……',
       rename: '正在重新命名……',
       mkdir: '正在建立資料夾……',
@@ -320,13 +396,27 @@ export default {
     warningTitle: '這些備份存在雲端機器上，不是保命備份',
     warningBody:
       '如果試用額度用完或 90 天到期，整台機器連同上面的備份都會被 Google 刪除。真正保得住世界的做法是按「存到電腦」把檔案下載回來。CraftLift 在你按下關機時會自動做這件事。',
-    keepNote: '自動保留最新的 {{count}} 份，較舊的會自動刪除以節省空間。',
-    createNow: '立刻備份',
-    working: '處理中…',
+    keepNote: '每一種各自保留最新的 {{count}} 份，較舊的會自動刪除以節省空間。',
     interval: '自動備份間隔（小時）',
-    intervalHint: '伺服器會依照這個間隔自動備份。備份前會先請 Minecraft 把資料寫入磁碟。',
+    intervalHint: '伺服器會依照這個間隔自動備份世界。備份前會先請 Minecraft 把資料寫入磁碟。',
+    intervalScope:
+      '這個間隔只管世界。伺服器設定不照時間備份——它只有在被改過之後才會多一份，沒動就不會重複存。',
     empty: '（還沒有任何備份）',
-    saveToPc: '存到電腦'
+    saveToPc: '下載至電腦',
+    groups: {
+      world: {
+        title: '世界',
+        desc: '你的存檔。依照上面的間隔自動備份。',
+        createNow: '立刻備份世界',
+        packing: '正在打包世界'
+      },
+      setup: {
+        title: '伺服器設定',
+        desc: '模組、伺服器設定、白名單與管理員名單。自動備份只有在改動過之後才會多一份，按下按鈕則不管有沒有變動都會存一份現在的。',
+        createNow: '立刻備份設定',
+        packing: '正在打包設定'
+      }
+    }
   },
   update: {
     title: '軟體更新',

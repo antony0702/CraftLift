@@ -1,3 +1,4 @@
+import type { ServerFlavor } from '@shared/types'
 import { BACKUP_KEEP, REMOTE } from '@shared/constants'
 
 export interface StartupScriptOptions {
@@ -9,6 +10,91 @@ export interface StartupScriptOptions {
   jvmHeap: string
   /** 自動備份間隔（小時） */
   backupIntervalHours: number
+  /** 主程式種類。vanilla 以外都要另外裝載入器。 */
+  flavor: ServerFlavor
+  /**
+   * 載入器的安裝來源。flavor 是 vanilla 時為 null。
+   *   serverJar —— 下載下來就是可以直接跑的 jar（Fabric）
+   *   installer —— 下載的是安裝程式，要在機器上跑 --installServer
+   */
+  loader: { kind: 'serverJar' | 'installer'; url: string } | null
+  /**
+   * 要一併放進 mods 的 Fabric API。只有 Fabric 需要——Forge 與 NeoForge
+   * 的 API 內建在載入器裡。不裝的話使用者上傳的第一個模組多半會因為
+   * 缺少依賴而讓伺服器起不來。
+   */
+  fabricApi: { fileName: string; url: string } | null
+}
+
+/**
+ * 產生安裝主程式的那一段，以及決定 systemd 要怎麼啟動它。
+ *
+ * 這段跑完之後 shell 變數 $LAUNCH 會是 java 後面要接的參數。
+ *
+ * Forge 與 NeoForge 的安裝程式產生什麼檔案、放在哪裡，各版本並不一致
+ * （1.17 前後是兩種完全不同的佈局），所以這裡不猜路徑，而是裝完在機器上
+ * 現找——找得到 unix_args.txt 就用新版的啟動方式，找不到就退回舊版那個
+ * 可以直接執行的 forge-*.jar。在這裡寫死一張對照表，遲早會在某個版本上壞掉。
+ */
+function buildInstallBlock(opts: StartupScriptOptions): string {
+  const dir = REMOTE.serverDir
+
+  if (opts.flavor === 'vanilla' || !opts.loader) {
+    return `echo "=== 下載 Minecraft 伺服器 ==="
+curl -fsSL -o ${dir}/server.jar "${opts.serverJarUrl}"
+LAUNCH="-jar ${dir}/server.jar nogui"`
+  }
+
+  // 停用中的模組放 mods/inactive。兩個載入器掃 mods 都不進子資料夾，
+  // 所以搬進去就等於關掉。兩個資料夾都要先建好，不然第一次停用會失敗。
+  const modDirs = `mkdir -p ${REMOTE.modsDir} ${REMOTE.inactiveModsDir}`
+
+  if (opts.loader.kind === 'serverJar') {
+    return `echo "=== 下載 Fabric 伺服器 ==="
+# Fabric 的伺服器啟動 jar 會在第一次執行時自己抓齊需要的程式庫，
+# 所以這裡跟原版一樣只要下載一個檔案。
+curl -fsSL -o ${dir}/server.jar "${opts.loader.url}"
+${modDirs}
+${
+  opts.fabricApi
+    ? `
+echo "=== 下載 Fabric API ==="
+# 絕大多數 Fabric 模組都依賴它，少了它使用者傳上來的第一個模組
+# 就會讓伺服器起不來。抓不到不擋安裝——伺服器本身仍然是好的，
+# 使用者之後可以自己補上。
+curl -fsSL -o ${REMOTE.modsDir}/${opts.fabricApi.fileName} "${opts.fabricApi.url}" || \\
+  echo "Fabric API 下載失敗，請自行放進 mods 資料夾" >&2
+`
+    : ''
+}
+LAUNCH="-jar ${dir}/server.jar nogui"`
+  }
+
+  return `echo "=== 安裝模組載入器 ==="
+curl -fsSL -o ${dir}/installer.jar "${opts.loader.url}"
+cd ${dir}
+java -jar ${dir}/installer.jar --installServer ${dir}
+rm -f ${dir}/installer.jar ${dir}/installer.jar.log
+mkdir -p ${REMOTE.modsDir} ${REMOTE.inactiveModsDir}
+
+# 裝完了，找出這一版要怎麼啟動
+ARGS_FILE=$(ls ${dir}/libraries/net/neoforged/neoforge/*/unix_args.txt 2>/dev/null | head -1)
+if [ -z "$ARGS_FILE" ]; then
+  ARGS_FILE=$(ls ${dir}/libraries/net/minecraftforge/forge/*/unix_args.txt 2>/dev/null | head -1)
+fi
+
+if [ -n "$ARGS_FILE" ]; then
+  # 1.17 之後：安裝程式產生一份參數檔，裡面是 classpath 與主類別
+  LAUNCH="@$ARGS_FILE nogui"
+else
+  # 1.17 之前：安裝程式直接產生一個可以執行的 jar
+  FORGE_JAR=$(ls ${dir}/forge-*.jar 2>/dev/null | grep -v installer | head -1)
+  if [ -z "$FORGE_JAR" ]; then
+    echo "安裝程式跑完了，但找不到可以啟動的檔案" >&2
+    exit 1
+  fi
+  LAUNCH="-jar $FORGE_JAR nogui"
+fi`
 }
 
 /**
@@ -22,8 +108,9 @@ export interface StartupScriptOptions {
  * 「崩潰自動重開」，這兩件事用 screen 都要自己補，而且補得不可靠。
  */
 export function buildStartupScript(opts: StartupScriptOptions): string {
-  const { serverJarUrl, javaMajorVersion, jvmHeap, backupIntervalHours } = opts
+  const { javaMajorVersion, jvmHeap, backupIntervalHours } = opts
   const dir = REMOTE.serverDir
+  const installBlock = buildInstallBlock(opts)
 
   return `#!/bin/bash
 set -euo pipefail
@@ -46,8 +133,7 @@ useradd -r -m -d ${dir} -s /usr/sbin/nologin minecraft || true
 mkdir -p ${dir} ${REMOTE.backupDir}
 cd ${dir}
 
-echo "=== 下載 Minecraft 伺服器 ==="
-curl -fsSL -o ${dir}/server.jar "${serverJarUrl}"
+${installBlock}
 
 # 同意 Minecraft 使用者條款。使用者在 CraftLift 的建立流程中已被告知這一點。
 echo "eula=true" > ${dir}/eula.txt
@@ -152,6 +238,19 @@ set -uo pipefail
 DIR=${dir}
 STAMP=$(date +%Y%m%d-%H%M%S)
 
+# 用法：backup.sh [world|setup|all] [force]
+#
+#   world  只備份世界
+#   setup  只備份模組與設定
+#   all    兩種都做（預設，排程用的就是這個）
+#
+#   force  設定那一包平常只有內容變了才重打，這個旗標會強制重打一份。
+#          使用者手動按下按鈕時就是要一份現在的快照，不管變沒變。
+WHAT=\${1:-all}
+FORCE=\${2:-}
+
+if [ "$WHAT" = "world" ] || [ "$WHAT" = "all" ]; then
+
 if systemctl is-active --quiet ${REMOTE.serviceName}; then
   python3 "$DIR/rcon.py" save-off  || true
   python3 "$DIR/rcon.py" save-all  || true
@@ -168,6 +267,44 @@ fi
 # 只保留最新的幾份，避免把磁碟塞爆
 ls -1t "$DIR"/backups/world-*.tar.gz 2>/dev/null | tail -n +$((${BACKUP_KEEP} + 1)) | xargs -r rm -f
 echo "備份完成: world-$STAMP.tar.gz"
+
+fi
+
+if [ "$WHAT" = "setup" ] || [ "$WHAT" = "all" ]; then
+
+# --- 模組與設定 ---
+#
+# 跟世界分開包，因為兩者的變化頻率差很多：世界每幾小時就不一樣，模組與
+# 設定幾乎不動，但一動就是幾百 MB。混在一起的話，每次自動備份都要重新
+# 壓縮整包模組，而且拉回本機時每次都得重傳一次。
+#
+# 所以只有內容真的變了才重打。判斷依據是「檔名＋大小＋修改時間」的清單，
+# 不對檔案內容算雜湊——對幾百 MB 的模組算 sha256 比重打包還慢。
+SIG_FILE="$DIR/.craftlift-setup-sig"
+SIG=$( { find "$DIR/mods" -type f -printf '%P\\t%s\\t%T@\\n' 2>/dev/null | sort
+         for f in server.properties whitelist.json ops.json banned-players.json; do
+           [ -f "$DIR/$f" ] && stat -c '%n %s %Y' "$DIR/$f"
+         done
+       } | md5sum | cut -d' ' -f1 )
+
+if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ] || [ "$FORCE" = "force" ]; then
+  CONFIGS=""
+  for f in server.properties whitelist.json ops.json banned-players.json; do
+    [ -f "$DIR/$f" ] && CONFIGS="$CONFIGS $f"
+  done
+  # mods 在原版伺服器上不存在，這時候這一包就只有設定檔，一樣有價值
+  [ -d "$DIR/mods" ] && CONFIGS="mods$CONFIGS"
+  if [ -n "$CONFIGS" ]; then
+    tar -czf "$DIR/backups/setup-$STAMP.tar.gz" -C "$DIR" $CONFIGS 2>/dev/null && \\
+      echo "$SIG" > "$SIG_FILE"
+    ls -1t "$DIR"/backups/setup-*.tar.gz 2>/dev/null | tail -n +$((${BACKUP_KEEP} + 1)) | xargs -r rm -f
+    echo "模組與設定已更新: setup-$STAMP.tar.gz"
+  fi
+else
+  echo "模組與設定沒有變動，沿用上一份"
+fi
+
+fi
 BACKUP
 chmod +x ${dir}/backup.sh
 
@@ -182,7 +319,10 @@ Wants=network-online.target
 Type=simple
 User=minecraft
 WorkingDirectory=${dir}
-ExecStart=/usr/bin/java -Xms${jvmHeap} -Xmx${jvmHeap} -jar ${dir}/server.jar nogui
+# $LAUNCH 由上面的安裝段決定：原版與 Fabric 是 -jar server.jar，
+# Forge／NeoForge 則是安裝程式產生的參數檔。這裡是用 shell 展開寫進
+# 檔案的，所以最後留在 unit 裡的是展開後的字面值。
+ExecStart=/usr/bin/java -Xms${jvmHeap} -Xmx${jvmHeap} $LAUNCH
 # 關機時給伺服器 90 秒好好存檔，不要直接砍掉
 ExecStop=/usr/bin/python3 ${dir}/rcon.py stop
 TimeoutStopSec=90

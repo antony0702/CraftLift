@@ -126,6 +126,27 @@ export default {
         'This is a rough estimate, useful for comparing configurations. Your actual cost is whatever Google bills you, and CraftLift takes no responsibility for the accuracy of this figure. It excludes network egress, discounts and free credits.'
     },
     version: 'Minecraft version',
+    flavor: 'Server type',
+    vanilla: 'Vanilla',
+    modded: 'Modded',
+    loaders: {
+      fabric: { name: 'Fabric', desc: 'Light, updates fastest' },
+      neoforge: { name: 'NeoForge', desc: 'The mainstream since 1.20.2' },
+      forge: { name: 'Forge', desc: 'Most older mods' }
+    },
+    loaderNeeds: 'Needs Minecraft {{version}} or newer',
+    loaderTooOld:
+      '{{loader}} has no build for Minecraft {{version}}. Pick another loader, or choose a newer Minecraft version above.',
+    loaderVersion: 'Loader version',
+    loaderVersionHint:
+      'Use the recommended one unless you know otherwise. Older builds are usually for a mod that only supports that version.',
+    loaderRecommended: 'Recommended (latest stable)',
+    loaderBeta: 'beta',
+    loaderLoading: 'Loading versions…',
+    loaderUnavailable: 'Could not load the version list; the recommended build will be used.',
+    moddedNote:
+      'Your players need the same loader and the same mods installed, or they cannot connect.',
+    moddedMemory: 'Mods are memory hungry — {{gb}} GB or more is recommended.',
     showAdvanced: 'Show advanced settings',
     hideAdvanced: 'Hide advanced settings',
     zone: 'Data centre',
@@ -159,6 +180,7 @@ export default {
     boot: 'Start',
     delete: 'Delete server',
     version: 'Version',
+    loader: 'Loader',
     machine: 'Machine',
     zone: 'Data centre',
     shutdownNote:
@@ -169,9 +191,58 @@ export default {
       console: 'Console',
       properties: 'Server settings',
       players: 'Players',
+      mods: 'Mods',
       files: 'Files',
       backups: 'Backups'
     }
+  },
+  mods: {
+    /* 英文要分單複數，跟「檔案」分頁同一套寫法 */
+    count_one: '{{count}} mod',
+    count_other: '{{count}} mods',
+    disabledCount_one: '{{count}} disabled',
+    disabledCount_other: '{{count}} disabled',
+    upload: 'Upload mods',
+    onlyJar: 'Mods must be .jar files.',
+    someSkipped_one: '{{count}} file was not a .jar and was skipped.',
+    someSkipped_other: '{{count}} files were not .jar files and were skipped.',
+    restartNote: 'Mods are only loaded when Minecraft starts.',
+    needRestart: 'Mods changed — restart Minecraft for it to take effect.',
+    restartNow: 'Restart',
+    restarting: 'Restarting…',
+    confirmRestart:
+      'Minecraft will restart and be unreachable for about a minute. The world is unaffected.',
+    confirmPlayers: '{{n}} players are online and will be kicked.',
+    on: 'Enabled',
+    off: 'Disabled',
+    enable: 'Enable',
+    disable: 'Disable',
+    empty: 'No mods yet. Drag .jar files in from your PC to upload them.',
+    badExtension: '(extension is not lowercase .jar — Fabric will not load it)',
+    detailsFileName: 'File name',
+    columns: {
+      name: 'Mod',
+      modified: 'Modified',
+      state: 'State',
+      size: 'Size'
+    },
+    menu: {
+      upload: 'Upload mods…'
+    },
+    busy: {
+      /* 進度條旁邊的說明，後面會接一條進度條，所以不用刪節號 */
+      upload: 'Uploading',
+      download: 'Downloading',
+      delete: 'Deleting…',
+      enable: 'Enabling…',
+      disable: 'Disabling…',
+      checking: 'Checking…'
+    },
+    confirmDeleteTitle: 'Delete mods',
+    confirmDelete_one: 'Delete this mod?',
+    confirmDelete_other: 'Delete these {{count}} mods?',
+    confirmDeleteNote:
+      'You would have to download them again. To turn one off temporarily, use Disable instead.'
   },
   console: {
     machineOff: 'The machine is not running',
@@ -191,6 +262,18 @@ export default {
     noLog: '(no log output yet)',
     commandPlaceholder: 'Type a command, e.g. time set day',
     send: 'Send'
+  },
+  transfer: {
+    pause: 'Pause',
+    resume: 'Resume',
+    cancel: 'Cancel',
+    /* One complete phrase per state rather than gluing words together */
+    upload: 'Uploading',
+    download: 'Downloading',
+    uploadPaused: 'Upload paused',
+    downloadPaused: 'Download paused',
+    uploadCancelled: 'Upload cancelled',
+    downloadCancelled: 'Download cancelled'
   },
   files: {
     notEditable: 'This is not a text file, so it cannot be opened in the built-in editor. Download it instead.',
@@ -233,8 +316,9 @@ export default {
     },
     busy: {
       open: 'Opening…',
-      upload: 'Uploading…',
-      download: 'Downloading…',
+      /* 這兩個後面會接一條進度條，所以不用刪節號 */
+      upload: 'Uploading',
+      download: 'Downloading',
       delete: 'Deleting…',
       rename: 'Renaming…',
       mkdir: 'Creating folder…',
@@ -341,14 +425,29 @@ export default {
     warningTitle: 'These backups live on the cloud machine — they are not a safety net',
     warningBody:
       'If your credit runs out or the 90 days expire, Google deletes the whole machine including these backups. The only thing that really saves your world is pressing “Save to PC”. CraftLift does this automatically when you shut the server down.',
-    keepNote: 'The newest {{count}} are kept automatically; older ones are deleted to save space.',
-    createNow: 'Back up now',
-    working: 'Working…',
+    keepNote:
+      'The newest {{count}} of each kind are kept automatically; older ones are deleted to save space.',
     interval: 'Automatic backup interval (hours)',
     intervalHint:
-      'The server backs itself up on this schedule, asking Minecraft to flush data to disk first.',
+      'The server backs the world up on this schedule, asking Minecraft to flush data to disk first.',
+    intervalScope:
+      'This interval covers the world only. Server setup is not backed up on a schedule — a new copy appears only after something changes, so nothing is stored twice.',
     empty: '(no backups yet)',
-    saveToPc: 'Save to PC'
+    saveToPc: 'Download to PC',
+    groups: {
+      world: {
+        title: 'World',
+        desc: 'Your save. Backed up automatically on the interval above.',
+        createNow: 'Back up world now',
+        packing: 'Packing the world'
+      },
+      setup: {
+        title: 'Server setup',
+        desc: 'Mods, server settings, whitelist and operators. The automatic copy only appears after something changes; pressing the button always stores the current state.',
+        createNow: 'Back up setup now',
+        packing: 'Packing the setup'
+      }
+    }
   },
   update: {
     title: 'Software update',

@@ -2,11 +2,11 @@ import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { pipeline } from 'node:stream/promises'
 import { REMOTE } from '@shared/constants'
 import type { FileEntry, SFTPWrapper } from 'ssh2'
 import type {
   Backup,
+  ModsListing,
   PlayerLists,
   RemoteFile,
   ServerProperties,
@@ -324,18 +324,219 @@ function sftpReaddir(sftp: SFTPWrapper, path: string): Promise<FileEntry[]> {
   })
 }
 
+/** 傳輸過程中回報已完成的位元組。不給也行，就是沒有進度可看。 */
+export type ProgressFn = (bytes: number) => void
+
+/** 讓呼叫端可以暫停／繼續／取消正在跑的這一段傳輸 */
+export interface TransferHooks {
+  onProgress?: ProgressFn
+  /** 串流準備好時交出遙控器。換一個檔案就會再呼叫一次。 */
+  attach?: (controls: { pause: () => void; resume: () => void; cancel: () => void } | null) => void
+}
+
+/**
+ * SFTP 傳輸的區塊大小與在途上限。
+ *
+ * 這兩個數字是整個傳輸速度的關鍵。SFTP 是一問一答的協定，吞吐量上限大約
+ * 是「同時在路上的資料量 ÷ 來回延遲」——ssh2 的 WriteStream 預設只讓 64KB
+ * 在路上，於是不管你的網路多快，實測就是每秒幾 MB，而且大半時間都在等
+ * 對方回應。
+ *
+ * 拉高 highWaterMark 之所以有效，是因為 ssh2 的 WriteStream 有實作 _writev：
+ * 緩衝區裡累積的區塊會被一次全部送出、平行等待。所以緩衝區越大，同時在
+ * 路上的請求就越多。這裡的 2MB／32KB 刻意跟 ssh2 自己的 fastPut 一致
+ * （64 個區塊 × 32KB），差別在於走串流我們才留得住暫停與取消——fastPut
+ * 沒有中途喊停的辦法。
+ */
+const CHUNK_BYTES = 32 * 1024
+const WINDOW_BYTES = 2 * 1024 * 1024
+
+/**
+ * 送一個檔案到遠端。
+ *
+ * **一定要等 'close'，不能只等 'finish'。** 這是先前「大檔案有時候傳不上去」
+ * 的原因：'finish' 只代表本地這端把資料全寫進串流了，SFTP 那邊還沒把遠端
+ * 檔案代號關閉、也還沒收到伺服器的確認。用 pipeline() 會在 'finish' 就回傳，
+ * 接著 withSftp 的 finally 立刻 sftp.end() 把通道收掉，還在路上的寫入就這樣
+ * 被丟掉——檔案越大、未確認的寫入越多，所以只有大檔會出事，小檔幾乎都正常。
+ * 這種壞法在畫面上完全看不出來：沒有錯誤，只是檔案沒出現或內容不完整。
+ */
+function uploadFile(
+  sftp: SFTPWrapper,
+  localPath: string,
+  remotePath: string,
+  hooks: TransferHooks = {}
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // 本機讀 32KB 一塊，遠端那頭允許 2MB 在路上——於是最多約 64 個寫入
+    // 請求同時等待，而不是寫一塊等一塊
+    const source = createReadStream(localPath, { highWaterMark: CHUNK_BYTES })
+    const sink = sftp.createWriteStream(remotePath, { highWaterMark: WINDOW_BYTES })
+
+    let settled = false
+    let cancelled = false
+    const cleanup = (): void => {
+      hooks.attach?.(null)
+      source.destroy()
+    }
+    const fail = (err: Error): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(err)
+    }
+    source.on('error', fail)
+    sink.on('error', fail)
+    if (hooks.onProgress) {
+      source.on('data', (chunk: Buffer | string) => hooks.onProgress?.(chunk.length))
+    }
+
+    // 一定要等 'close'，不能只等 'finish'。'finish' 只代表本地這端把資料
+    // 全交出去了，SFTP 那邊還沒關閉遠端檔案代號、也還沒收到伺服器的確認；
+    // 這時候若把通道收掉，還在路上的寫入就這樣被丟掉——檔案越大未確認的
+    // 寫入越多，所以只有大檔會出事，而且不會有任何錯誤訊息。
+    sink.on('close', () => {
+      if (settled) return
+      settled = true
+      hooks.attach?.(null)
+      if (cancelled) reject(new Error('TRANSFER_CANCELLED'))
+      else resolve()
+    })
+
+    hooks.attach?.({
+      pause: () => source.pause(),
+      resume: () => source.resume(),
+      cancel: () => {
+        cancelled = true
+        // 先把來源拆掉停止餵資料，再結束寫入端讓遠端檔案代號正常關閉。
+        // 直接砸掉寫入端會在伺服器上留一個沒關的代號。
+        source.unpipe(sink)
+        source.destroy()
+        sink.end()
+      }
+    })
+
+    source.pipe(sink)
+  })
+}
+
+/** 同上，反方向。本機這端一樣等 'close' 才算寫完。 */
+function downloadFile(
+  sftp: SFTPWrapper,
+  remotePath: string,
+  localPath: string,
+  hooks: TransferHooks = {}
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // 下載這端 ssh2 的 ReadStream 是一次一個請求，沒有 _writev 那種批次
+    // 機制可以借力，但把每次請求拉大同樣能減少來回次數
+    const source = sftp.createReadStream(remotePath, { highWaterMark: WINDOW_BYTES })
+    const sink = createWriteStream(localPath)
+
+    let settled = false
+    let cancelled = false
+    const fail = (err: Error): void => {
+      if (settled) return
+      settled = true
+      hooks.attach?.(null)
+      source.destroy()
+      reject(err)
+    }
+    source.on('error', fail)
+    sink.on('error', fail)
+    if (hooks.onProgress) {
+      source.on('data', (chunk: Buffer | string) => hooks.onProgress?.(chunk.length))
+    }
+    sink.on('close', () => {
+      if (settled) return
+      settled = true
+      hooks.attach?.(null)
+      if (cancelled) reject(new Error('TRANSFER_CANCELLED'))
+      else resolve()
+    })
+
+    hooks.attach?.({
+      pause: () => source.pause(),
+      resume: () => source.resume(),
+      cancel: () => {
+        cancelled = true
+        source.unpipe(sink)
+        source.destroy()
+        sink.end()
+      }
+    })
+
+    source.pipe(sink)
+  })
+}
+
 /** 把一整棵本機資料夾樹送進暫存區 */
-async function uploadTree(sftp: SFTPWrapper, localDir: string, remoteDir: string): Promise<void> {
+async function uploadTree(
+  sftp: SFTPWrapper,
+  localDir: string,
+  remoteDir: string,
+  hooks: TransferHooks = {}
+): Promise<void> {
   await sftpMkdir(sftp, remoteDir)
   for (const entry of await readdir(localDir, { withFileTypes: true })) {
     const local = join(localDir, entry.name)
     const remote = `${remoteDir}/${entry.name}`
     if (entry.isDirectory()) {
-      await uploadTree(sftp, local, remote)
+      await uploadTree(sftp, local, remote, hooks)
     } else if (entry.isFile()) {
-      await pipeline(createReadStream(local), sftp.createWriteStream(remote))
+      await uploadFile(sftp, local, remote, hooks)
     }
     // 捷徑與其他特殊檔案跳過——它們在遠端沒有意義
+  }
+}
+
+/** 本機這一份東西總共幾個位元組。資料夾要走進去加總。 */
+export async function localSize(path: string): Promise<number> {
+  const info = await stat(path)
+  if (!info.isDirectory()) return info.size
+  let total = 0
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory() || entry.isFile()) {
+      total += await localSize(join(path, entry.name))
+    }
+  }
+  return total
+}
+
+/**
+ * 上傳完之後量一下遠端實際收到多少，對不上就報錯。
+ *
+ * 傳輸中途被截掉是不會有任何錯誤訊息的，沒有這一步的話畫面會顯示上傳
+ * 成功，而遠端那個檔案是壞的。
+ *
+ * 這一段刻意跟上面的搬移分開跑，而且量不到就直接放過。第一版把它接在
+ * 搬移的 && 鏈尾巴，結果一個成功的 3GB 上傳被判成失敗——四個錯疊在一起：
+ *
+ *  1. `du` 沒加 sudo。/opt/minecraft 是 minecraft 的，登入的使用者連
+ *     進去都不行（這個檔案裡每一個讀取都有 sudo，就是這個原因）。
+ *  2. 錯誤被管線吃掉。`du … | cut` 的結束碼是 cut 的，永遠是 0。
+ *  3. `Number('')` 是 0 不是 NaN。於是「量不到」被講成「實際 0 位元組」。
+ *  4. 就算前三個都對，`du` 也還是錯的量法——它會把每個資料夾自己佔的
+ *     區塊算進去，而本機那邊只加總檔案大小，資料夾一多就永遠不相等。
+ *
+ * 所以現在：只加總一般檔案的大小、find 成功才輸出標記、沒有標記就
+ * 什麼都不說。「無法確認」不等於「壞了」。
+ */
+async function verifyUploadedSize(
+  conn: ServerConnection,
+  remotePath: string,
+  expected: number
+): Promise<void> {
+  const probe = await conn.exec(
+    `if OUT=$(sudo find ${sq(remotePath)} -type f -printf '%s\\n'); then ` +
+      `echo "CRAFTLIFT_SIZE:$(printf '%s\\n' "$OUT" | awk '{s+=$1} END{print s+0}')"; fi`
+  )
+  const measured = probe.stdout.match(/CRAFTLIFT_SIZE:(\d+)/)
+  if (!measured) return
+
+  const uploaded = Number(measured[1])
+  if (uploaded !== expected) {
+    throw new Error(`上傳沒有完整送達：預期 ${expected} 位元組，實際 ${uploaded}。請重試一次。`)
   }
 }
 
@@ -348,7 +549,8 @@ export async function uploadPath(
   conn: ServerConnection,
   localPath: string,
   remotePath: string,
-  replace = false
+  replace = false,
+  hooks: TransferHooks = {}
 ): Promise<void> {
   assertInServerDir(remotePath)
   const staging = stagingPath()
@@ -357,9 +559,9 @@ export async function uploadPath(
   try {
     await conn.withSftp(async (sftp) => {
       if (info.isDirectory()) {
-        await uploadTree(sftp, localPath, staging)
+        await uploadTree(sftp, localPath, staging, hooks)
       } else {
-        await pipeline(createReadStream(localPath), sftp.createWriteStream(staging))
+        await uploadFile(sftp, localPath, staging, hooks)
       }
     })
 
@@ -370,6 +572,8 @@ export async function uploadPath(
         `sudo cp -a -- ${sq(staging)} ${sq(remotePath)}`
     )
     if (result.code !== 0) throw new Error(result.stderr.trim() || '上傳失敗')
+
+    await verifyUploadedSize(conn, remotePath, await localSize(localPath))
   } finally {
     // 半路失敗也要清，不然 /tmp 會慢慢被沒人認領的半成品塞滿
     await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
@@ -377,7 +581,12 @@ export async function uploadPath(
 }
 
 /** 把暫存區的一棵樹抓回本機 */
-async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: string): Promise<void> {
+async function downloadTree(
+  sftp: SFTPWrapper,
+  remoteDir: string,
+  localDir: string,
+  hooks: TransferHooks = {}
+): Promise<void> {
   await mkdir(localDir, { recursive: true })
   for (const entry of await sftpReaddir(sftp, remoteDir)) {
     const remote = `${remoteDir}/${entry.filename}`
@@ -385,9 +594,9 @@ async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: stri
     // SFTP 只給 POSIX 的 mode 位元，沒有現成的 isDirectory()。
     // 0o170000 是檔案類型那四個位元的遮罩，0o040000 就是「資料夾」。
     if ((entry.attrs.mode & 0o170000) === 0o040000) {
-      await downloadTree(sftp, remote, local)
+      await downloadTree(sftp, remote, local, hooks)
     } else {
-      await pipeline(sftp.createReadStream(remote), createWriteStream(local))
+      await downloadFile(sftp, remote, local, hooks)
     }
   }
 }
@@ -402,7 +611,10 @@ async function downloadTree(sftp: SFTPWrapper, remoteDir: string, localDir: stri
 export async function downloadPath(
   conn: ServerConnection,
   remotePath: string,
-  localPath: string
+  localPath: string,
+  hooks: TransferHooks = {},
+  /** 總位元組。呼叫端想先知道要拉多少時傳進來收。 */
+  onTotal?: (bytes: number) => void
 ): Promise<void> {
   assertInServerDir(remotePath)
   const staging = stagingPath()
@@ -412,20 +624,96 @@ export async function downloadPath(
       `sudo cp -a -- ${sq(remotePath)} ${sq(staging)} && ` +
         `sudo chown -R $(id -u):$(id -g) ${sq(staging)} && ` +
         `sudo chmod -R u+rwX ${sq(staging)} && ` +
+        // 大小跟「是不是資料夾」在同一趟問完，不多花一次往返
+        `du -sb ${sq(staging)} | cut -f1 && ` +
         `if test -d ${sq(staging)}; then echo DIR; else echo FILE; fi`
     )
     if (prep.code !== 0) throw new Error(prep.stderr.trim() || '準備下載失敗')
 
+    const lines = prep.stdout.trim().split('\n')
+    const total = Number(lines[lines.length - 2])
+    if (onTotal && Number.isFinite(total)) onTotal(total)
+
     await conn.withSftp(async (sftp) => {
       if (prep.stdout.includes('DIR')) {
-        await downloadTree(sftp, staging, localPath)
+        await downloadTree(sftp, staging, localPath, hooks)
       } else {
-        await pipeline(sftp.createReadStream(staging), createWriteStream(localPath))
+        await downloadFile(sftp, staging, localPath, hooks)
       }
     })
   } finally {
     // 用 sudo 刪：chown 那步若沒跑到，暫存還是 root 的，一般身分刪不掉
     await conn.exec(`sudo rm -rf -- ${sq(staging)}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 模組
+// ---------------------------------------------------------------------------
+
+/**
+ * 列出模組：mods 底下的是啟用中，mods/inactive 底下的是停用中。
+ *
+ * 只認副檔名是 .jar 的（不分大小寫，因為要把大寫那種也列出來提醒使用者）。
+ * 資料夾裡其他東西——設定檔、快取、載入器自己產生的目錄——不是模組，
+ * 列出來只會讓人以為可以停用它們。
+ *
+ * 用一次 find 掃兩層，而不是分兩趟。每個遠端操作都是一趟 SSH 往返，
+ * 能合併就合併。
+ *
+ * 資料夾不存在時 find 什麼都不吐而不是丟例外，剛好就是我們要的：
+ * 一台還沒放過模組的伺服器回傳空清單，不是錯誤。
+ */
+export async function listMods(conn: ServerConnection): Promise<ModsListing> {
+  // 順便問 Minecraft 是什麼時候啟動的。這個數字決定「改完還沒重啟」——
+  // 讓機器自己算，比在畫面上記一個旗標可靠：切分頁、關掉 app、從別的
+  // 分頁重啟伺服器，這些情況下旗標都會說謊，而時間戳不會。
+  const result = await conn.exec(
+    `date -d "$(systemctl show ${REMOTE.serviceName} --value -p ActiveEnterTimestamp 2>/dev/null)" +%s 2>/dev/null || echo 0; ` +
+      `echo '---'; ` +
+      `sudo find ${sq(REMOTE.modsDir)} ${sq(REMOTE.inactiveModsDir)} ` +
+      `-maxdepth 1 -mindepth 1 -type f -printf '%h\\t%s\\t%T@\\t%f\\0' 2>/dev/null || true`
+  )
+
+  const [head, ...rest] = result.stdout.split('---')
+  // 服務沒在跑（或問不到）時是 0。這時候不該說「需要重新啟動」——
+  // 它根本沒在跑，該做的是啟動而不是重啟，那是主控台分頁的事。
+  const startedAt = Number(head.trim()) * 1000
+
+  const mods = rest
+    .join('---')
+    // echo 在分隔線後面留下的那個換行會黏在第一筆的資料夾欄位上，
+    // 讓路徑變成 "\n/opt/minecraft/mods/..."，連帶把啟用狀態也判錯
+    // （比對不到 inactive，於是每個模組看起來都是啟用中）。
+    .replace(/^\r?\n/, '')
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => {
+      const [dir, size, mtime, ...nameParts] = entry.split('\t')
+      const name = nameParts.join('\t')
+      return { dir, name, size: Number(size) || 0, mtime: Number(mtime) || 0 }
+    })
+    .filter((f) => /\.jar$/i.test(f.name))
+    .map((f) => ({
+      fileName: f.name,
+      path: `${f.dir}/${f.name}`,
+      name: f.name.replace(/\.jar$/i, ''),
+      // 路徑決定啟用狀態，檔名不參與判斷
+      enabled: f.dir.replace(/\/+$/, '') !== REMOTE.inactiveModsDir,
+      loadable: f.name.endsWith('.jar'),
+      size: f.size,
+      modifiedAt: Math.floor(f.mtime * 1000)
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  // 有任何一個模組比服務的啟動時間新，就代表現在跑的那份 Minecraft
+  // 沒有載到它。啟用與停用都是搬檔案，搬過去的那份 mtime 會更新，
+  // 所以兩個方向都抓得到。
+  const newest = mods.reduce((max, m) => Math.max(max, m.modifiedAt), 0)
+  return {
+    mods,
+    needsRestart: startedAt > 0 && newest > startedAt,
+    running: startedAt > 0
   }
 }
 
@@ -441,9 +729,19 @@ export async function listBackups(conn: ServerConnection): Promise<Backup[]> {
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
 }
 
-/** 立刻執行一次備份（會先叫伺服器把資料寫入磁碟） */
-export async function createBackup(conn: ServerConnection): Promise<string> {
-  const result = await conn.exec(`sudo ${REMOTE.serverDir}/backup.sh`)
+/**
+ * 立刻執行一次備份（世界那包會先叫伺服器把資料寫入磁碟）。
+ *
+ * kind 決定備份哪一種。手動備份設定時會強制重打一份——平常那一包只有
+ * 內容變了才重做，但使用者按下按鈕時要的是「現在這一刻的快照」，
+ * 回他一句「沒有變動所以沒做」不是他要的答案。
+ */
+export async function createBackup(
+  conn: ServerConnection,
+  kind: 'world' | 'setup' | 'all' = 'all'
+): Promise<string> {
+  const force = kind === 'setup' ? ' force' : ''
+  const result = await conn.exec(`sudo ${REMOTE.serverDir}/backup.sh ${kind}${force}`)
   if (result.code !== 0) throw new Error(result.stderr.trim() || '備份失敗')
   return result.stdout.trim()
 }

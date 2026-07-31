@@ -2,7 +2,12 @@ import { randomBytes } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { CreateServerOptions, InstanceState, MinecraftServer } from '@shared/types'
+import type {
+  CreateServerOptions,
+  InstanceState,
+  MinecraftServer,
+  ServerFlavor
+} from '@shared/types'
 import { CRAFTLIFT_LABEL, DISK_TYPE, META, REMOTE } from '@shared/constants'
 import { runGcloud, runGcloudJson } from './exec'
 
@@ -30,7 +35,20 @@ function metaValue(raw: RawInstance, key: string): string | null {
   return raw.metadata?.items?.find((i) => i.key === key)?.value ?? null
 }
 
+/**
+ * metadata 裡的種類字串轉回型別。
+ *
+ * v1.1.0 之前建立的機器沒有這個鍵，而那些機器裝的確實是原版，所以
+ * 讀不到就是 vanilla。認不得的值也一樣——與其顯示一個不存在的載入器，
+ * 不如當成原版，至少畫面不會叫使用者去管一個不存在的 mods 資料夾。
+ */
+function toFlavor(value: string | null): ServerFlavor {
+  const known: ServerFlavor[] = ['vanilla', 'fabric', 'neoforge', 'forge']
+  return known.find((f) => f === value) ?? 'vanilla'
+}
+
 function toServer(raw: RawInstance): MinecraftServer {
+  const flavor = toFlavor(metaValue(raw, META.flavor))
   return {
     name: raw.name,
     displayName: metaValue(raw, META.displayName) ?? raw.name,
@@ -39,6 +57,8 @@ function toServer(raw: RawInstance): MinecraftServer {
     externalIp: raw.networkInterfaces?.[0]?.accessConfigs?.[0]?.natIP ?? null,
     machineType: lastSegment(raw.machineType),
     mcVersion: metaValue(raw, META.mcVersion) ?? '未知',
+    flavor,
+    loaderVersion: flavor === 'vanilla' ? null : metaValue(raw, META.loaderVersion),
     tier: metaValue(raw, META.tier) ?? 'standard',
     createdAt: metaValue(raw, META.createdAt)
   }
@@ -172,7 +192,9 @@ function regionOf(zone: string): string {
 export async function createServer(
   projectId: string,
   opts: CreateServerOptions,
-  startupScript: string
+  startupScript: string,
+  /** 實際裝上去的載入器版本。呼叫端在建立前就已經把「交給我們挑」定案了。 */
+  loaderVersion: string | null
 ): Promise<MinecraftServer> {
   if (!opts.acceptedDisclaimer) {
     throw new Error('DISCLAIMER_NOT_ACCEPTED')
@@ -209,7 +231,10 @@ export async function createServer(
       `--boot-disk-type=${DISK_TYPE}`,
       `--tags=${CRAFTLIFT_LABEL}`,
       `--labels=${CRAFTLIFT_LABEL}=true`,
-      `--metadata=${META.mcVersion}=${opts.mcVersion},${META.tier}=${opts.machineType},${META.createdAt}=${new Date().toISOString()}`,
+      // 載入器版本只在模組伺服器上寫。metadata 的值不能是空字串，
+      // 寫一個空的鍵之後讀回來會分不清「原版」與「查不到版本」。
+      `--metadata=${META.mcVersion}=${opts.mcVersion},${META.tier}=${opts.machineType},${META.createdAt}=${new Date().toISOString()},${META.flavor}=${opts.flavor}` +
+        (loaderVersion ? `,${META.loaderVersion}=${loaderVersion}` : ''),
       { literal: `--metadata-from-file=startup-script=${scriptPath},${META.displayName}=${namePath}` }
     ]
 

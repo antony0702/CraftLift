@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { MachineType, McVersion, PriceEstimate } from '@shared/types'
+import type {
+  LoaderVersion,
+  MachineType,
+  McVersion,
+  ModLoader,
+  PriceEstimate,
+  ServerFlavor
+} from '@shared/types'
 import {
   DEFAULT_DISK_GB,
   DEFAULT_TIER,
   DEFAULT_USE_STATIC_IP,
   DEFAULT_ZONE,
+  LOADERS,
+  MODDED_RECOMMENDED_RAM_GB,
   PRICING_CALCULATOR_URL,
   TIERS,
   ZONES,
-  jvmHeapFor
+  jvmHeapFor,
+  mcVersionAtLeast
 } from '@shared/constants'
 import { call, errorText } from '../lib/api'
 import { ErrorText, Field, Info, Loading } from '../components/Ui'
@@ -38,6 +48,12 @@ export default function CreateServer({
 
   const [displayName, setDisplayName] = useState('')
   const [mcVersion, setMcVersion] = useState('')
+  const [flavor, setFlavor] = useState<ServerFlavor>('vanilla')
+  /** 載入器版本。'' 代表交給 CraftLift 挑最新正式版。 */
+  const [loaderVersion, setLoaderVersion] = useState('')
+  const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>([])
+  const [loaderLoading, setLoaderLoading] = useState(false)
+  const [loaderFailed, setLoaderFailed] = useState(false)
   const [zone, setZone] = useState(DEFAULT_ZONE)
   const [diskGb, setDiskGb] = useState(DEFAULT_DISK_GB)
   const [useStaticIp, setUseStaticIp] = useState(DEFAULT_USE_STATIC_IP)
@@ -99,6 +115,49 @@ export default function CreateServer({
       }
     })()
   }, [advanced, zone, family])
+
+  /** 這個載入器支援目前選的 Minecraft 版本嗎 */
+  const loaderFits = (loader: ModLoader): boolean => {
+    const spec = LOADERS.find((l) => l.id === loader)
+    return !spec || !mcVersion || mcVersionAtLeast(mcVersion, spec.minMcVersion)
+  }
+  const loaderTooOld = flavor !== 'vanilla' && !loaderFits(flavor)
+
+  // 載入器版本清單。換 Minecraft 版本或換載入器都要重抓——同一個載入器
+  // 在不同 Minecraft 版本下是完全不同的一串版本號。
+  useEffect(() => {
+    if (flavor === 'vanilla' || !mcVersion) {
+      setLoaderVersions([])
+      setLoaderFailed(false)
+      return
+    }
+    let cancelled = false
+    setLoaderLoading(true)
+    setLoaderFailed(false)
+    void (async () => {
+      try {
+        const list = await call(window.api.loader.versions(flavor, mcVersion))
+        if (!cancelled) setLoaderVersions(list)
+      } catch {
+        // 查不到不是死路：留空字串就是「交給 CraftLift 挑」，主行程那端
+        // 本來就會自己選最新的正式版。這裡只要說清楚會發生什麼事。
+        if (!cancelled) {
+          setLoaderVersions([])
+          setLoaderFailed(true)
+        }
+      } finally {
+        if (!cancelled) setLoaderLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [flavor, mcVersion])
+
+  // 換過載入器或 Minecraft 版本之後，先前選的那個版本號多半已經不存在了
+  useEffect(() => {
+    setLoaderVersion('')
+  }, [flavor, mcVersion])
 
   const families = useMemo(
     () => [...new Set(machineTypes.map((m) => m.family))].sort(),
@@ -170,6 +229,8 @@ export default function CreateServer({
         window.api.server.create({
           displayName: displayName.trim() || 'Minecraft',
           mcVersion,
+          flavor,
+          loaderVersion: flavor === 'vanilla' ? '' : loaderVersion,
           machineType,
           cpus: spec.cpus,
           memoryGb: spec.memoryGb,
@@ -253,6 +314,88 @@ export default function CreateServer({
           ))}
         </select>
       </Field>
+
+      {/* ── 原版還是模組 ──
+          先問「要不要模組」再問「哪一種」。把四個選項並排會讓使用者以為
+          Fabric 跟原版是同一層的選擇，但實際上絕大多數人只要判斷第一題。 */}
+      <p className="field-label">{t('create.flavor')}</p>
+      <div className="segmented">
+        <button
+          type="button"
+          aria-pressed={flavor === 'vanilla'}
+          onClick={() => setFlavor('vanilla')}
+        >
+          {t('create.vanilla')}
+        </button>
+        <button
+          type="button"
+          aria-pressed={flavor !== 'vanilla'}
+          onClick={() => setFlavor((prev) => (prev === 'vanilla' ? 'fabric' : prev))}
+        >
+          {t('create.modded')}
+        </button>
+      </div>
+
+      {flavor !== 'vanilla' && (
+        <div className="loader-choice">
+          <div className="tiers">
+            {LOADERS.map((option) => {
+              const fits = loaderFits(option.id)
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="tier"
+                  aria-pressed={option.id === flavor}
+                  onClick={() => setFlavor(option.id)}
+                >
+                  <b>{t(`create.loaders.${option.id}.name`)}</b>
+                  <span className="spec">
+                    {fits
+                      ? t(`create.loaders.${option.id}.desc`)
+                      : t('create.loaderNeeds', { version: option.minMcVersion })}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {loaderTooOld ? (
+            /* 選了但版本搭不起來。與其偷偷幫他換掉，不如擋住並講原因——
+               自己換掉的話，使用者會拿到一台跟他選的不一樣的伺服器。 */
+            <p className="error">
+              {t('create.loaderTooOld', {
+                loader: t(`create.loaders.${flavor}.name`),
+                version: mcVersion
+              })}
+            </p>
+          ) : (
+            <Field label={t('create.loaderVersion')} hint={t('create.loaderVersionHint')}>
+              <select
+                value={loaderVersion}
+                disabled={loaderLoading || loaderVersions.length === 0}
+                onChange={(e) => setLoaderVersion(e.target.value)}
+              >
+                <option value="">{t('create.loaderRecommended')}</option>
+                {loaderVersions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.id}
+                    {v.stable ? '' : ` (${t('create.loaderBeta')})`}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {loaderLoading && <p className="muted small">{t('create.loaderLoading')}</p>}
+          {loaderFailed && <p className="muted small">{t('create.loaderUnavailable')}</p>}
+
+          {/* 這是模組伺服器最常見的失敗原因，不能只寫在說明文件裡 */}
+          <div className="notice">
+            <p className="small">{t('create.moddedNote')}</p>
+          </div>
+        </div>
+      )}
 
       <button type="button" className="bare" onClick={() => setAdvanced((p) => !p)}>
         {advanced ? t('create.hideAdvanced') : t('create.showAdvanced')}
@@ -391,6 +534,13 @@ export default function CreateServer({
           )}
         </div>
 
+        {/* 模組吃記憶體吃得比原版兇得多，在這裡講是因為旁邊就是規格 */}
+        {flavor !== 'vanilla' && spec && spec.memoryGb < MODDED_RECOMMENDED_RAM_GB && (
+          <p className="muted small">
+            {t('create.moddedMemory', { gb: MODDED_RECOMMENDED_RAM_GB })}
+          </p>
+        )}
+
         {estimateFailed ? (
           <p className="muted small">{t('create.estimate.unavailable')}</p>
         ) : !estimate ? (
@@ -444,7 +594,7 @@ export default function CreateServer({
         <button
           type="button"
           className="torch"
-          disabled={!accepted || !mcVersion || !spec}
+          disabled={!accepted || !mcVersion || !spec || loaderTooOld}
           onClick={() => void submit()}
         >
           {t('create.submit')}

@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, RemoteFile, TransferItem, UploadItem } from '@shared/types'
 import { REMOTE } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
+import { completedKey, useTransfers } from '../../lib/transfers'
 import { ErrorText, Loading, Modal, Waiting } from '../../components/Ui'
+import Transfers from '../../components/Transfers'
 
 /**
  * 檔案分頁。
@@ -108,6 +110,14 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
   const listRef = useRef<HTMLDivElement>(null)
   const conflictAnswer = useRef<((choice: ConflictChoice | null) => void) | null>(null)
 
+  // 進度由主行程保管，所以切到別的分頁再回來，還在傳的東西依然看得到
+  const transfers = useTransfers(server.name)
+
+  // 傳輸完成後要重讀「現在這個資料夾」。用 ref 而不是把 path 放進相依，
+  // 否則每次換資料夾都會多觸發一次重讀。
+  const pathRef = useRef(path)
+  pathRef.current = path
+
   // --- 讀取與導覽 -----------------------------------------------------------
 
   const load = useCallback(
@@ -131,6 +141,13 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
     // 一掛上就把焦點拿過來，這樣不用先點一下才能用鍵盤
     listRef.current?.focus({ preventScroll: true })
   }, [load])
+
+  // 傳輸完成就重讀一次。整段上傳都發生在別的分頁上時，這裡是唯一會讓
+  // 清單跟上的機會——當初送出上傳的那個元件早就卸載了。
+  const finished = completedKey(transfers)
+  useEffect(() => {
+    if (finished) void load(pathRef.current)
+  }, [finished, load])
 
   /** 換資料夾並記進上一頁／下一頁的歷程 */
   const goTo = useCallback(
@@ -804,7 +821,10 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
           </span>
         )}
         <div className="grow" />
-        {busyNow && (
+        {/* 傳輸有自己的進度條；其餘操作（刪除、改名、貼上）沒有可量的進度，
+            繼續用逐格等待指示 */}
+        <Transfers transfers={transfers.filter((job) => job.kind !== 'backup')} />
+        {busyNow && transfers.length === 0 && (
           <span className="busy">
             <Waiting /> {busy}
           </span>

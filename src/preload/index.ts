@@ -6,15 +6,19 @@ import type {
   CreateServerOptions,
   FeedbackInput,
   GcloudStatus,
+  LoaderVersion,
   MachineType,
   McVersion,
   MinecraftServer,
+  ModLoader,
+  ModsListing,
   PlayerLists,
   Preferences,
   PriceEstimate,
   RemoteFile,
   Result,
   ServerProperties,
+  Transfer,
   TransferItem,
   UpdateState,
   UploadItem
@@ -77,6 +81,52 @@ const api = {
     versions: (includeSnapshots = false): Promise<Result<McVersion[]>> =>
       invoke('mc:versions', includeSnapshots),
     latest: (): Promise<Result<string>> => invoke('mc:latest')
+  },
+
+  /** 模組載入器（來自各載入器官方的公開版本資料） */
+  loader: {
+    /** 這個載入器搭配這個 Minecraft 版本可以用的版本，新的排前面 */
+    versions: (loader: ModLoader, mcVersion: string): Promise<Result<LoaderVersion[]>> =>
+      invoke('loader:versions', loader, mcVersion)
+  },
+
+  /**
+   * 模組管理。
+   *
+   * 這裡只有兩個方法，因為模組分頁做的事其實就是檔案總管做的事：上傳、
+   * 刪除、下載、改名，全部走 files.* 那一套已經驗過的路徑（含路徑逃逸
+   * 防護）。「停用」在模組生態裡本來就是把副檔名改成 .disabled，所以它
+   * 也是一次 files.rename，不需要自己的通道。
+   *
+   * 剩下這兩個是檔案總管給不了的：一個要判斷啟用狀態並拆出好看的名稱，
+   * 一個要在系統對話框裡只顯示 .jar。
+   */
+  mods: {
+    list: (name: string, zone: string): Promise<Result<ModsListing>> =>
+      invoke('mods:list', name, zone),
+    /** 開檔案選擇視窗（只顯示 .jar），回傳選到的本機路徑，還沒上傳 */
+    pick: (): Promise<Result<string[]>> => invoke('mods:pick')
+  },
+
+  /**
+   * 上傳與下載的進度。
+   *
+   * 狀態由主行程保管，畫面只是訂閱者——所以切到別的分頁再回來，
+   * 還在跑的傳輸依然看得到，不會像以前那樣憑空消失。
+   */
+  transfer: {
+    /** 現在有哪些正在傳。畫面重新掛載時用這個補回進度。 */
+    list: (): Promise<Result<Transfer[]>> => invoke('transfer:list'),
+    /** 暫停：停止餵資料，連線與遠端檔案代號都留著，隨時可以繼續 */
+    pause: (id: string): Promise<Result<void>> => invoke('transfer:pause', id),
+    resume: (id: string): Promise<Result<void>> => invoke('transfer:resume', id),
+    /** 取消。目的地那個檔案不會被動到——搬過去是在整份傳完之後才發生的。 */
+    cancel: (id: string): Promise<Result<void>> => invoke('transfer:cancel', id),
+    onChange: (handler: (list: Transfer[]) => void): (() => void) => {
+      const listener = (_e: unknown, list: Transfer[]): void => handler(list)
+      ipcRenderer.on('transfer:changed', listener)
+      return () => ipcRenderer.removeListener('transfer:changed', listener)
+    }
   },
 
   /** 伺服器的建立與電源控制 */
@@ -177,8 +227,12 @@ const api = {
   /** 備份 */
   backup: {
     list: (name: string, zone: string): Promise<Result<Backup[]>> => invoke('backup:list', name, zone),
-    create: (name: string, zone: string): Promise<Result<string>> =>
-      invoke('backup:create', name, zone),
+    /** 立刻備份。kind 決定備份世界還是模組與設定，不給就兩種都做。 */
+    create: (
+      name: string,
+      zone: string,
+      kind: 'world' | 'setup' | 'all' = 'all'
+    ): Promise<Result<string>> => invoke('backup:create', name, zone, kind),
     setInterval: (name: string, zone: string, hours: number): Promise<Result<void>> =>
       invoke('backup:setInterval', name, zone, hours)
   },

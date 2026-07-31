@@ -7,6 +7,7 @@ import { Back } from '../components/Icons'
 import WorldBlock from '../components/WorldBlock'
 import ConsoleTab from './tabs/ConsoleTab'
 import FilesTab from './tabs/FilesTab'
+import ModsTab from './tabs/ModsTab'
 import PropertiesTab from './tabs/PropertiesTab'
 import PlayersTab from './tabs/PlayersTab'
 import BackupsTab from './tabs/BackupsTab'
@@ -36,6 +37,7 @@ export default function ServerDetail({
   const [players, setPlayers] = useState<number | null>(null)
 
   const running = server.state === 'RUNNING'
+  const modded = server.flavor !== 'vanilla'
   const moving =
     server.state === 'STAGING' || server.state === 'STOPPING' || server.state === 'PROVISIONING'
 
@@ -142,6 +144,15 @@ export default function ServerDetail({
           <dl>
             <dt>{t('detail.version')}</dt>
             <dd className="fact">{server.mcVersion}</dd>
+            {modded && (
+              <>
+                <dt>{t('detail.loader')}</dt>
+                <dd className="fact">
+                  {t(`create.loaders.${server.flavor}.name`)}
+                  {server.loaderVersion ? ` ${server.loaderVersion}` : ''}
+                </dd>
+              </>
+            )}
             <dt>{t('detail.machine')}</dt>
             <dd className="fact">{server.machineType}</dd>
             <dt>{t('detail.zone')}</dt>
@@ -170,10 +181,13 @@ export default function ServerDetail({
           <Tabs
             active={tab}
             onChange={setTab}
+            /* 模組分頁只給模組伺服器。原版沒有 mods 資料夾，
+               留一個永遠空著的分頁只會讓人以為東西丟進去會生效。 */
             tabs={[
               { id: 'console', label: t('detail.tabs.console') },
               { id: 'properties', label: t('detail.tabs.properties') },
               { id: 'players', label: t('detail.tabs.players') },
+              ...(modded ? [{ id: 'mods', label: t('detail.tabs.mods') }] : []),
               { id: 'files', label: t('detail.tabs.files') },
               { id: 'backups', label: t('detail.tabs.backups') }
             ]}
@@ -189,6 +203,7 @@ export default function ServerDetail({
               {tab === 'console' && <ConsoleTab server={server} />}
               {tab === 'properties' && <PropertiesTab server={server} />}
               {tab === 'players' && <PlayersTab server={server} />}
+              {tab === 'mods' && modded && <ModsTab server={server} />}
               {tab === 'files' && <FilesTab server={server} />}
               {tab === 'backups' && <BackupsTab server={server} />}
             </>
