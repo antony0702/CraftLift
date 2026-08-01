@@ -362,13 +362,49 @@ button.danger:hover:not(:disabled) {
   min-height: 100vh;
   background: var(--stone-900);
 }
+/* 視窗列同時是系統的標題列。標成拖曳區之後，移動視窗、拖到邊緣貼齊、
+   雙擊最大化、右鍵系統選單就都是 Windows 自己處理的。
+   注意：拖曳區裡的任何可點擊元素都必須標回 no-drag，否則點不到。 */
 .bar {
   display: flex;
   align-items: center;
   gap: 11px;
   height: 55px;
-  padding: 0 22px;
+  padding: 0 0 0 22px;
   border-bottom: 1px solid var(--edge-soft);
+  -webkit-app-region: drag;
+}
+.bar button,
+.bar a {
+  -webkit-app-region: no-drag;
+}
+
+/* ── 視窗按鈕 ─────────────────────────────────────────────────
+   貼在右上角，尺寸沿用系統的 46×32 邏輯像素——肌肉記憶記的是位置和
+   大小，換成別的尺寸會讓人點空。顏色是石頭色，只有關閉在滑過時變紅：
+   那是唯一一個按下去會失去東西的。 */
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  margin-left: 11px;
+}
+.window-controls button {
+  width: 46px;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--dust);
+}
+.window-controls button:hover:not(:disabled) {
+  background: var(--stone-700);
+  color: var(--bone);
+}
+.window-controls button.close:hover:not(:disabled) {
+  background: var(--ember);
+  color: var(--bone);
 }
 .bar .wordmark {
   font-size: 22px;
@@ -1082,6 +1118,45 @@ button.danger:hover:not(:disabled) {
 .warn {
   color: var(--ember);
   font-size: 11px;
+}
+
+/* ── 伺服器圖示 ───────────────────────────────────────────────
+   64×64 的圖，用 pixelated 放大：Minecraft 的圖示本來就是點陣的，
+   平滑縮放會把它糊掉，而這整套介面的前提就是像素要對齊格點。
+   外框用石頭色而不是光——它是一張圖，不是狀態，不該花掉橘色預算。 */
+.server-icon {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  margin: 0 0 33px;
+}
+.server-icon-preview {
+  width: 66px;
+  height: 66px;
+  border: 1px solid var(--edge);
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--stone-900);
+}
+.server-icon-preview img {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+  display: block;
+}
+/* 沒有圖示：一塊比背景再暗一階的方，講「這裡空著」而不是「這裡壞了」 */
+.server-icon-empty {
+  width: 64px;
+  height: 64px;
+  background: var(--void);
+}
+.server-icon-body {
+  flex: 1;
+  min-width: 0;
+}
+.server-icon-body .actions {
+  margin-top: 11px;
 }
 
 /* ── 費用估算 ───────────────────────────────────────────────── */

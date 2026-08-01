@@ -31,6 +31,8 @@ export const REMOTE = {
    */
   inactiveModsDir: '/opt/minecraft/mods/inactive',
   logFile: '/opt/minecraft/logs/latest.log',
+  /** 玩家在多人遊戲清單裡看到的那張圖。Minecraft 只認 64×64 的 PNG。 */
+  iconFile: '/opt/minecraft/server-icon.png',
   serviceName: 'minecraft',
   rconPort: 25575,
   gamePort: 25565

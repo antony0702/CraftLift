@@ -46,6 +46,7 @@ import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
 import { estimatePrice } from './gcloud/pricing'
 import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
+import { readIcon, removeIcon, writeIcon } from './server/icon'
 import { listLoaderVersions, resolveFabricApi, resolveLoaderInstall } from './loaders'
 import type { LoaderInstall } from './loaders'
 import { buildStartupScript } from './server/startupScript'
@@ -253,6 +254,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
         if (actual !== remembered) {
           currentProjectId = actual
           await setPreferences({ lastProjectId: actual })
+          // 記住的那個是錯的——畫面已經用它查過一輪並顯示了錯誤，
+          // 通知它重來一次，否則那行紅字會一直留著，而它其實已經不成立了。
+          getWindow()?.webContents.send('project:changed', actual)
         }
       })
       return currentProjectId
@@ -629,6 +633,34 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return picked.canceled ? [] : picked.filePaths
   })
 
+  // --- 伺服器圖示 -----------------------------------------------------------
+  /**
+   * 玩家在多人遊戲清單裡看到的那張圖。尺寸檢查與縮放在主行程做，
+   * 因為 nativeImage 只有這裡有——畫面那端拿到的已經是處理好的結果。
+   */
+  handle('icon:get', async (name: string, zone: string): Promise<string | null> =>
+    withConnection(name, zone, readIcon)
+  )
+
+  handle('icon:set', async (name: string, zone: string, localPath: string): Promise<void> =>
+    withConnection(name, zone, (conn) => writeIcon(conn, localPath))
+  )
+
+  handle('icon:clear', async (name: string, zone: string): Promise<void> =>
+    withConnection(name, zone, removeIcon)
+  )
+
+  /** 只顯示圖片的檔案選擇視窗 */
+  handle('icon:pick', async (): Promise<string | null> => {
+    const window = getWindow()
+    if (!window) return null
+    const picked = await dialog.showOpenDialog(window, {
+      properties: ['openFile'],
+      filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'] }]
+    })
+    return picked.canceled ? null : (picked.filePaths[0] ?? null)
+  })
+
   handle('backup:list', async (name: string, zone: string): Promise<Backup[]> =>
     withConnection(name, zone, ops.listBackups)
   )
@@ -703,6 +735,30 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   /** 應用程式版本，顯示在標題列旁 */
   handle('app:version', async (): Promise<string> => app.getVersion())
+
+  // --- 視窗按鈕 -------------------------------------------------------------
+  /**
+   * 無邊框視窗自己畫的那三顆按鈕。
+   *
+   * 只有這三件事需要走 IPC——拖曳、貼齊、四邊縮放、雙擊最大化、右鍵系統
+   * 選單全部由 Windows 自己處理（見 index.ts 的 titleBarStyle）。
+   */
+  handle('window:minimize', async (): Promise<void> => {
+    getWindow()?.minimize()
+  })
+
+  handle('window:toggleMaximize', async (): Promise<void> => {
+    const window = getWindow()
+    if (!window) return
+    if (window.isMaximized()) window.unmaximize()
+    else window.maximize()
+  })
+
+  handle('window:close', async (): Promise<void> => {
+    getWindow()?.close()
+  })
+
+  handle('window:isMaximized', async (): Promise<boolean> => getWindow()?.isMaximized() ?? false)
 
   // --- 自動更新 -------------------------------------------------------------
   // 進度與結果都透過 update:state 事件推給畫面，這幾個 handler 只負責觸發。

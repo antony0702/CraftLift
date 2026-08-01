@@ -4,6 +4,21 @@ export default {
     tagline: '在 Google Cloud 上架設你自己的 Minecraft 伺服器'
   },
   nav: { settings: '設定' },
+  /* 視窗自己的按鈕。無邊框視窗之後這三個是我們自己畫的。 */
+  window: {
+    minimize: '最小化',
+    maximize: '最大化',
+    restore: '還原',
+    close: '關閉'
+  },
+  /* gcloud 認得出來的失敗。認不出來的會直接顯示原文。 */
+  errors: {
+    projectMissing: '找不到你的 Google Cloud 專案，它可能已經被刪除了。重新整理後 CraftLift 會再找一次。',
+    permissionDenied: '這個 Google 帳號沒有權限做這件事。請確認登入的是建立這些伺服器的那個帳號。',
+    apiDisabled: 'Google Cloud 的必要服務還沒啟用。請到設定重新執行一次初始設定。',
+    iconNotSquare: '只支援正方形的圖片。這張圖不是正方形，請先自己裁成方的再上傳。',
+    iconUnreadable: '這個檔案讀不出來，請換一張圖片。'
+  },
   common: {
     error: '發生錯誤',
     retry: '重試',
@@ -324,6 +339,13 @@ export default {
   },
   props: {
     restartNote: '存檔後會重新啟動 Minecraft 才會生效，按下儲存時會先問你。',
+    icon: {
+      label: '伺服器圖示',
+      hint: '玩家在多人遊戲清單裡看到的那張小圖。只收正方形的圖片，會自動縮成 64×64。換過之後要重新啟動 Minecraft 才會生效。',
+      upload: '上傳圖片',
+      replace: '更換圖片',
+      remove: '移除'
+    },
     saved: '已儲存',
     checking: '確認中…',
     restarting: '重新啟動中…',

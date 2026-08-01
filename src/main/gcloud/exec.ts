@@ -108,7 +108,8 @@ async function runGcloudRaw(args: GcloudArg[]): Promise<{ stdout: string; stderr
     // 對除錯完全沒幫助，所以這裡把 stderr 撈出來。
     const e = err as { stderr?: string; message?: string }
     const detail = (e.stderr ?? '').trim() || e.message || String(err)
-    throw new Error(detail)
+    // 非零結束碼吐的也是同一批訊息，一樣先換成代碼再往上丟
+    throw new Error(describeFailure(detail))
   }
 }
 
@@ -140,8 +141,38 @@ export async function runGcloud(args: GcloudArg[]): Promise<string> {
 const GCLOUD_PARTIAL_FAILURE =
   /Some requests did not succeed|was not found|PERMISSION_DENIED|Permission denied|has not been used in project|^ERROR:/im
 
+/**
+ * 把 gcloud 的失敗訊息換成畫面認得的代碼。
+ *
+ * gcloud 講的是英文，而且講的是它自己的世界的話：
+ * 「The resource 'projects/craftlift-48a0d61e6d' was not found」對使用者
+ * 來說既看不懂，也看不出下一步該做什麼。認得出來的幾種在這裡換成代碼，
+ * 由畫面那端翻成使用者的語言。
+ *
+ * 認不出來的原樣往上丟。全部換成一句「發生錯誤」會把真正有用的細節吃掉——
+ * 使用者看不懂的訊息至少還能貼給別人看，被吃掉的訊息誰也救不了。
+ */
+export const GCLOUD_ERROR_PREFIX = 'craftlift:'
+
+function classify(stderr: string): string | null {
+  if (/has not been used in project|SERVICE_DISABLED/i.test(stderr)) {
+    return `${GCLOUD_ERROR_PREFIX}apiDisabled`
+  }
+  // 專案不見了要排在權限前面：專案被刪掉時 gcloud 兩種訊息都可能吐
+  if (/projects\/[^']*' was not found|was not found.*projects\//i.test(stderr)) {
+    return `${GCLOUD_ERROR_PREFIX}projectMissing`
+  }
+  if (/PERMISSION_DENIED|Permission denied|not authorized/i.test(stderr)) {
+    return `${GCLOUD_ERROR_PREFIX}permissionDenied`
+  }
+  return null
+}
+
 /** 把 gcloud 的多行警告壓成一句話。細節那一行比開頭的橫幅有用。 */
 function describeFailure(stderr: string): string {
+  const code = classify(stderr)
+  if (code) return code
+
   const lines = stderr
     .split('\n')
     .map((line) => line.trim())

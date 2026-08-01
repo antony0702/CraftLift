@@ -55,7 +55,19 @@ const api = {
     ensure: (billingAccountId: string): Promise<Result<string>> =>
       invoke('project:ensure', billingAccountId),
     /** 徹底清除：刪掉整個專案，連同所有會計費的資源 */
-    delete: (): Promise<Result<void>> => invoke('project:delete')
+    delete: (): Promise<Result<void>> => invoke('project:delete'),
+    /**
+     * 背景核對發現記住的專案是錯的時候會通知一次。
+     *
+     * 啟動時為了不讓畫面等 gcloud 四秒，先用記住的專案 ID 去查——
+     * 那個專案如果已經被刪掉，畫面會先顯示一次錯誤。核對完成後靠這個
+     * 事件叫畫面重來，錯誤才不會留在那裡騙人。
+     */
+    onChanged: (fn: (projectId: string | null) => void): (() => void) => {
+      const listener = (_e: unknown, projectId: string | null): void => fn(projectId)
+      ipcRenderer.on('project:changed', listener)
+      return () => ipcRenderer.removeListener('project:changed', listener)
+    }
   },
 
   /** 機器規格與費用估算 */
@@ -106,6 +118,22 @@ const api = {
       invoke('mods:list', name, zone),
     /** 開檔案選擇視窗（只顯示 .jar），回傳選到的本機路徑，還沒上傳 */
     pick: (): Promise<Result<string[]>> => invoke('mods:pick')
+  },
+
+  /**
+   * 伺服器圖示：玩家在多人遊戲清單裡看到的那張圖。
+   *
+   * 尺寸檢查與縮放都在主行程做完，這裡拿到的 get 結果已經是可以直接
+   * 放進 <img src> 的 data URL。
+   */
+  icon: {
+    get: (name: string, zone: string): Promise<Result<string | null>> =>
+      invoke('icon:get', name, zone),
+    set: (name: string, zone: string, localPath: string): Promise<Result<void>> =>
+      invoke('icon:set', name, zone, localPath),
+    clear: (name: string, zone: string): Promise<Result<void>> => invoke('icon:clear', name, zone),
+    /** 開圖片選擇視窗，回傳本機路徑；取消時是 null */
+    pick: (): Promise<Result<string | null>> => invoke('icon:pick')
   },
 
   /**
@@ -281,6 +309,25 @@ const api = {
   },
 
   /** 偏好設定與雜項 */
+  /**
+   * 視窗本身的操作。
+   *
+   * 只有這三顆按鈕需要走這裡；拖曳、貼齊、縮放、雙擊最大化都是 Windows
+   * 自己做的，畫面那端只要把標題列標成拖曳區就好。
+   */
+  window: {
+    minimize: (): Promise<Result<void>> => invoke('window:minimize'),
+    toggleMaximize: (): Promise<Result<void>> => invoke('window:toggleMaximize'),
+    close: (): Promise<Result<void>> => invoke('window:close'),
+    isMaximized: (): Promise<Result<boolean>> => invoke('window:isMaximized'),
+    /** 最大化狀態改變時通知。回傳取消訂閱的函式。 */
+    onMaximizedChange: (handler: (maximized: boolean) => void): (() => void) => {
+      const listener = (_e: unknown, maximized: boolean): void => handler(maximized)
+      ipcRenderer.on('window:maximized', listener)
+      return () => ipcRenderer.removeListener('window:maximized', listener)
+    }
+  },
+
   app: {
     getPreferences: (): Promise<Result<Preferences>> => invoke('prefs:get'),
     setPreferences: (updates: Partial<Preferences>): Promise<Result<Preferences>> =>

@@ -89,3 +89,58 @@ export function FileIcon({ size = 14 }: IconProps): React.JSX.Element {
     </svg>
   )
 }
+
+/* ── 視窗按鈕 ─────────────────────────────────────────────────
+   無邊框視窗自己畫的那三顆。刻意畫得比系統的細——它們不是這個畫面
+   要人看的東西，只是在原本的位置提供原本的功能。線寬固定 1px 而不
+   隨 size 變，粗一點就會從「窗框」變成「按鈕」。 */
+
+/** 最小化：一條底線 */
+export function WinMinimize({ size = 10 }: IconProps): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
+      <rect x="1" y="5" width="8" height="1" />
+    </svg>
+  )
+}
+
+/** 最大化：一個空的方框 */
+export function WinMaximize({ size = 10 }: IconProps): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
+      <rect x="1" y="1" width="8" height="1" />
+      <rect x="1" y="8" width="8" height="1" />
+      <rect x="1" y="2" width="1" height="6" />
+      <rect x="8" y="2" width="1" height="6" />
+    </svg>
+  )
+}
+
+/** 還原：兩個錯開的方框，後面那個只露出兩條邊 */
+export function WinRestore({ size = 10 }: IconProps): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
+      <rect x="3" y="0" width="7" height="1" />
+      <rect x="9" y="1" width="1" height="6" />
+      <rect x="3" y="6" width="6" height="1" />
+      <rect x="0" y="3" width="7" height="1" />
+      <rect x="0" y="9" width="7" height="1" />
+      <rect x="0" y="4" width="1" height="5" />
+      <rect x="6" y="4" width="1" height="5" />
+    </svg>
+  )
+}
+
+/** 關閉：一個叉 */
+export function WinClose({ size = 10 }: IconProps): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <rect key={`a${i}`} x={1 + i} y={1 + i} width="1" height="1" />
+      ))}
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <rect key={`b${i}`} x={8 - i} y={1 + i} width="1" height="1" />
+      ))}
+    </svg>
+  )
+}
