@@ -1,5 +1,6 @@
-import type { ServerFlavor } from '@shared/types'
+import type { ServerFlavor, ServerProperties } from '@shared/types'
 import { BACKUP_KEEP, REMOTE } from '@shared/constants'
+import { DEFAULT_SERVER_ICON_BASE64 } from '@shared/serverIcon'
 
 export interface StartupScriptOptions {
   /** Mojang 官方的 server.jar 下載網址 */
@@ -24,6 +25,54 @@ export interface StartupScriptOptions {
    * 缺少依賴而讓伺服器起不來。
    */
   fabricApi: { fileName: string; url: string } | null
+  /** The first server.properties, as collected by the create screen */
+  properties: ServerProperties
+}
+
+/**
+ * Make one setting value safe to put in the script.
+ *
+ * These values are typed by the user (the MOTD, the world seed), and the
+ * script is shell, executed on the machine. A newline in a value would add a
+ * settings line of its own, and a `$(...)` inside an expanding heredoc would
+ * run. So: newlines and CRs are dropped, length is capped, and this block is
+ * always written with a quoted heredoc (<<'PROPS'), where nothing expands.
+ */
+function sanitizeValue(value: string): string {
+  return value.replace(/[\r\n]/g, ' ').slice(0, 200)
+}
+
+/**
+ * Build the first server.properties.
+ *
+ * Written in two parts: what the user filled in goes through a heredoc that
+ * expands nothing, and only the RCON lines use an expanding one — the RCON
+ * password is a shell variable generated on the machine, so it has to expand.
+ * Split this way, nothing the user typed can ever be taken as a command.
+ */
+function buildPropertiesBlock(properties: ServerProperties): string {
+  const lines = Object.entries(properties)
+    // An empty seed means "generate a random world". Minecraft accepts an
+    // empty line for it, but a blank field in the file reads like a broken
+    // setting to anyone who opens it.
+    .filter(([key, value]) => !(key === 'level-seed' && value.trim() === ''))
+    .map(([key, value]) => `${key}=${sanitizeValue(value)}`)
+    .join('\n')
+
+  return `cat > ${REMOTE.serverDir}/server.properties <<'PROPS'
+${lines}
+PROPS
+
+# These RCON lines carry the password generated on the machine, so this is a
+# second, expanding heredoc. Everything the user typed is in the block above,
+# which expands nothing.
+cat >> ${REMOTE.serverDir}/server.properties <<PROPS
+enable-rcon=true
+rcon.port=${REMOTE.rconPort}
+rcon.password=$RCON_PASSWORD
+broadcast-rcon-to-ops=false
+server-port=${REMOTE.gamePort}
+PROPS`
 }
 
 /**
@@ -144,33 +193,24 @@ RCON_PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 24)
 echo "$RCON_PASSWORD" > ${dir}/rcon-password
 chmod 600 ${dir}/rcon-password
 
-# 新伺服器的預設設定。使用者之後可以在「伺服器設定」分頁改。
+# What the user filled in on the create screen. Still changeable later in the
+# "server settings" tab.
 #
-# 注意 white-list=true：這代表伺服器一建好，連建立者自己都進不去，
-# 必須先把玩家加進白名單。這是刻意的選擇——公開的 Minecraft 伺服器
-# 幾分鐘內就會被掃描到，沒有白名單等於開門讓陌生人進來拆房子。
-# UI 會在白名單是空的時候提醒使用者先把自己加進去。
-cat > ${dir}/server.properties <<PROPS
-enable-rcon=true
-rcon.port=${REMOTE.rconPort}
-rcon.password=$RCON_PASSWORD
-broadcast-rcon-to-ops=false
-server-port=${REMOTE.gamePort}
-motd=CraftLift 伺服器
-max-players=10
-difficulty=hard
-gamemode=survival
-pvp=true
-hardcore=false
-white-list=true
-online-mode=true
-allow-nether=true
-allow-flight=false
-spawn-monsters=true
-view-distance=10
-simulation-distance=10
-spawn-protection=16
-PROPS
+# Note white-list: it defaults to true, which means that the moment the server
+# exists not even its owner can get in until a player is on the list. That is
+# deliberate — a public Minecraft server is found by scanners within minutes,
+# and no whitelist is an open door. The UI points this out while the list is
+# still empty.
+${buildPropertiesBlock(opts.properties)}
+
+# The default server icon — the small image players see in the multiplayer
+# list. Starting with CraftLift's block is easier to recognise than the grey
+# one Minecraft falls back to; the user can replace it in "server settings".
+cat > ${dir}/server-icon.b64 <<'ICON'
+${DEFAULT_SERVER_ICON_BASE64}
+ICON
+base64 -d ${dir}/server-icon.b64 > ${REMOTE.iconFile}
+rm -f ${dir}/server-icon.b64
 
 # --- RCON 用戶端 ---
 # 備份時需要先叫伺服器把資料寫到磁碟，否則會打包到寫到一半的區塊檔。

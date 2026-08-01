@@ -6,8 +6,10 @@ import type {
   McVersion,
   ModLoader,
   PriceEstimate,
-  ServerFlavor
+  ServerFlavor,
+  ServerProperties
 } from '@shared/types'
+import { DEFAULT_PROPERTIES, PROPERTY_FIELDS } from '@shared/properties'
 import {
   DEFAULT_DISK_GB,
   DEFAULT_TIER,
@@ -23,6 +25,7 @@ import {
 } from '@shared/constants'
 import { call, errorText } from '../lib/api'
 import { ErrorText, Field, Info, Loading } from '../components/Ui'
+import PropertyFields from '../components/PropertyFields'
 import WorldBlock from '../components/WorldBlock'
 
 /** 支援自訂核心與記憶體的系列，與主行程的清單保持一致 */
@@ -72,6 +75,16 @@ export default function CreateServer({
   const [estimate, setEstimate] = useState<PriceEstimate | null>(null)
   const [estimateFailed, setEstimateFailed] = useState(false)
 
+  /**
+   * The Minecraft settings the new server starts with.
+   *
+   * Asked here rather than after creation: changing them later needs a
+   * restart, and the user has just spent minutes waiting for the machine.
+   */
+  const [properties, setProperties] = useState<ServerProperties>({ ...DEFAULT_PROPERTIES })
+  const updateProperty = (key: string, value: string): void =>
+    setProperties((prev) => ({ ...prev, [key]: value }))
+
   useEffect(() => {
     void (async () => {
       try {
@@ -90,9 +103,10 @@ export default function CreateServer({
     })()
   }, [t])
 
-  // 機型清單依區域而異，換區域要重抓
+  // The machine catalogue differs per zone, so refetch when the zone changes.
+  // Fetched in simple mode too: the tiers name a preferred machine type plus a
+  // fallback, and only this list says which of them the zone actually offers.
   useEffect(() => {
-    if (!advanced) return
     void (async () => {
       setMachinesLoading(true)
       setMachinesError('')
@@ -114,7 +128,7 @@ export default function CreateServer({
         setMachinesLoading(false)
       }
     })()
-  }, [advanced, zone, family])
+  }, [zone, family])
 
   /** 這個載入器支援目前選的 Minecraft 版本嗎 */
   const loaderFits = (loader: ModLoader): boolean => {
@@ -168,11 +182,24 @@ export default function CreateServer({
     [machineTypes, family]
   )
 
-  /** 目前實際會送出的機器規格 */
+  /** The machine spec that will actually be submitted */
   const spec = useMemo(() => {
     if (!advanced) {
       const chosen = TIERS.find((x) => x.id === tier) ?? TIERS[1]
-      return { name: chosen.machineType, family: 'e2', cpus: chosen.cpus, memoryGb: chosen.ramGb }
+      // Take the first candidate this zone offers. Not every family exists
+      // everywhere — Tokyo has no C3D at all today — and every candidate for a
+      // tier has the same cpus and memory, so the spec shown stays true either
+      // way. If the catalogue could not be loaded, fall back to the preferred
+      // one: creating with a name the zone rejects beats not creating at all.
+      const name =
+        chosen.machineTypes.find((candidate) => machineTypes.some((m) => m.name === candidate)) ??
+        chosen.machineTypes[0]
+      return {
+        name,
+        family: name.split('-')[0],
+        cpus: chosen.cpus,
+        memoryGb: chosen.ramGb
+      }
     }
     if (custom) return { name: '', family, cpus, memoryGb: memory }
     const found = machineTypes.find((m) => m.name === selectedType)
@@ -237,6 +264,7 @@ export default function CreateServer({
           zone,
           diskGb,
           useStaticIp,
+          properties,
           acceptedDisclaimer: accepted
         })
       )
@@ -396,6 +424,19 @@ export default function CreateServer({
           </div>
         </div>
       )}
+
+      {/* ── Minecraft settings ──
+          Asked here so the first thing a user does with a brand new server
+          isn't changing settings and waiting through another restart. Same
+          fields, same wording as the settings tab — they share one table. */}
+      <div className="game-settings">
+        <p className="field-label">{t('create.gameSettings')}</p>
+        <PropertyFields
+          fields={PROPERTY_FIELDS}
+          values={properties}
+          onChange={updateProperty}
+        />
+      </div>
 
       <button type="button" className="bare" onClick={() => setAdvanced((p) => !p)}>
         {advanced ? t('create.hideAdvanced') : t('create.showAdvanced')}

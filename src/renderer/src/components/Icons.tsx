@@ -9,21 +9,22 @@ interface IconProps {
   size?: number
 }
 
-/** 齒輪：偏好設定的入口 */
-export function Gear({ size = 18 }: IconProps): React.JSX.Element {
+/**
+ * 設定：三條滑桿。
+ *
+ * 原本是齒輪，但 18px 的點陣格線放不下齒輪的齒——八個角上的小方塊配一個
+ * 挖空的中心，看起來像太陽而不是齒輪。滑桿在這個尺寸下不會認錯：三條線
+ * 加三個突出來的把手，就算全部同色也讀得出來，因為把手比線高。
+ */
+export function Sliders({ size = 18 }: IconProps): React.JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
-      <rect x="7" y="1" width="4" height="2" />
-      <rect x="7" y="15" width="4" height="2" />
-      <rect x="1" y="7" width="2" height="4" />
-      <rect x="15" y="7" width="2" height="4" />
-      <rect x="3" y="3" width="2" height="2" />
-      <rect x="13" y="3" width="2" height="2" />
-      <rect x="3" y="13" width="2" height="2" />
-      <rect x="13" y="13" width="2" height="2" />
-      <rect x="5" y="5" width="8" height="8" />
-      {/* 中間挖空。用背景色而非 fill-rule，這樣在深淺主題都對。 */}
-      <rect x="7" y="7" width="4" height="4" fill="var(--stone-900)" />
+      <rect x="1" y="3" width="16" height="2" />
+      <rect x="4" y="1" width="3" height="6" />
+      <rect x="1" y="8" width="16" height="2" />
+      <rect x="11" y="6" width="3" height="6" />
+      <rect x="1" y="13" width="16" height="2" />
+      <rect x="7" y="11" width="3" height="6" />
     </svg>
   )
 }

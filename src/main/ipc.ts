@@ -24,6 +24,7 @@ import type {
   UploadItem
 } from '@shared/types'
 import { jvmHeapFor, REMOTE } from '@shared/constants'
+import { DEFAULT_PROPERTIES } from '@shared/properties'
 import { applyZoom } from './zoom'
 import { feedbackFormUrl, submitFeedback } from './feedback'
 import { getGcloudStatus } from './gcloud/exec'
@@ -46,7 +47,7 @@ import { buildCustomMachineType, listMachineTypes } from './gcloud/machineTypes'
 import { estimatePrice } from './gcloud/pricing'
 import type { EstimateInput } from './gcloud/pricing'
 import { getServerJarInfo, latestRelease, listVersions } from './mojang'
-import { readIcon, removeIcon, writeIcon } from './server/icon'
+import { probeIcon, readIcon, resetIcon, writeIcon } from './server/icon'
 import { listLoaderVersions, resolveFabricApi, resolveLoaderInstall } from './loaders'
 import type { LoaderInstall } from './loaders'
 import { buildStartupScript } from './server/startupScript'
@@ -330,7 +331,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       backupIntervalHours: prefs.backupIntervalHours,
       flavor: opts.flavor,
       loader: loader ? { kind: loader.kind, url: loader.url } : null,
-      fabricApi
+      fabricApi,
+      // The create screen already asked for these, so they go into the very
+      // first server.properties — otherwise the first thing a user does with a
+      // new server is change settings and wait out another restart
+      properties: { ...DEFAULT_PROPERTIES, ...opts.properties }
     })
     return createServer(projectId, opts, script, loader?.version ?? null)
   })
@@ -646,8 +651,15 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     withConnection(name, zone, (conn) => writeIcon(conn, localPath))
   )
 
-  handle('icon:clear', async (name: string, zone: string): Promise<void> =>
-    withConnection(name, zone, removeIcon)
+  /** Measure. The renderer uses this to decide whether to ask about cropping. */
+  handle(
+    'icon:probe',
+    async (localPath: string): Promise<{ width: number; height: number } | null> =>
+      probeIcon(localPath)
+  )
+
+  handle('icon:reset', async (name: string, zone: string): Promise<void> =>
+    withConnection(name, zone, resetIcon)
   )
 
   /** 只顯示圖片的檔案選擇視窗 */

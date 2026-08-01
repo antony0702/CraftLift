@@ -4,7 +4,7 @@ import type { Backup, MinecraftServer } from '@shared/types'
 import { BACKUP_KEEP } from '@shared/constants'
 import { call, errorText, formatSize, formatTime } from '../../lib/api'
 import { completedKey, percentOf, useTransfers } from '../../lib/transfers'
-import { ErrorText, Field, Loading, Progress, TransferRow } from '../../components/Ui'
+import { ErrorText, Field, Info, Loading, Progress, TransferRow } from '../../components/Ui'
 
 /**
  * 備份分成兩類，靠檔名前綴分辨。
@@ -145,9 +145,6 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
           </button>
         </div>
       </Field>
-      {/* 這個間隔只管世界。設定那一包是變動時才做的，寫清楚，
-          否則使用者會以為調了這個數字兩種都會照做。 */}
-      <p className="muted small">{t('backups.intervalScope')}</p>
 
       <ErrorText>{message}</ErrorText>
 
@@ -157,7 +154,12 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
         return (
           <div className="backup-group" key={section.id}>
             <div className="toolbar">
-              <h3>{t(`backups.groups.${section.id}.title`)}</h3>
+              <h3>
+                {t(`backups.groups.${section.id}.title`)}
+                {/* Only the setup archive has a rule worth stating: it is
+                    rebuilt on change, not on the schedule above. */}
+                {section.id === 'setup' && <Info text={t('backups.groups.setup.hint')} />}
+              </h3>
               <div className="grow" />
               <button
                 type="button"
@@ -168,7 +170,6 @@ export default function BackupsTab({ server }: { server: MinecraftServer }): Rea
                 {t(`backups.groups.${section.id}.createNow`)}
               </button>
             </div>
-            <p className="muted small">{t(`backups.groups.${section.id}.desc`)}</p>
 
             {/* 打包中：顯示不確定進度。伺服器上的 tar 沒有辦法回報做到幾成，
                 硬畫一條會填滿的進度條等於編數字——這時候誠實比較有用。

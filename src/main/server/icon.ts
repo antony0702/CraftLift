@@ -3,36 +3,40 @@ import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, nativeImage } from 'electron'
 import { REMOTE } from '@shared/constants'
+import { DEFAULT_SERVER_ICON_BASE64 } from '@shared/serverIcon'
 import type { ServerConnection } from './ssh'
-import { deleteRemoteFiles, downloadPath, uploadPath } from './operations'
+import { downloadPath, uploadPath } from './operations'
 
 /**
- * 伺服器圖示——玩家在多人遊戲清單裡看到的那張小圖。
+ * The server icon — the small image players see in their multiplayer list.
  *
- * Minecraft 只認伺服器根目錄下 64×64 的 `server-icon.png`，尺寸不對就整張
- * 不顯示，而且不會說為什麼。所以這裡在送上去之前就把圖處理好。
+ * Minecraft only reads a 64×64 `server-icon.png` in the server root. Wrong
+ * dimensions and it shows nothing at all, without saying why. So the image is
+ * put right here, before it is sent.
  *
- * 縮放用 Electron 內建的 nativeImage，不引入影像套件：這件事一年跑不了幾次，
- * 為它多背一個相依套件並不划算。
+ * Scaling uses Electron's built-in nativeImage rather than an image library:
+ * this runs a handful of times a year, and is not worth another dependency.
  *
- * 非正方形的圖直接擋掉而不是自己裁切——裁切等於替使用者決定要留哪一半，
- * 而他八成會發現自己的圖被切掉了頭。講清楚讓他自己準備一張方的比較好。
+ * A non-square image is never cropped on its own — cropping decides for the
+ * user which half to keep, and they will notice their picture lost its head.
+ * Instead the renderer measures it with probeIcon first, asks whether to crop,
+ * and only then calls in.
  */
 const SIZE = 64
 
-/** 圖片本身壞掉或根本不是圖片 */
+/** The file is broken, or is not an image at all */
 export const ICON_UNREADABLE = 'craftlift:iconUnreadable'
-/** 不是正方形。訊息要由畫面翻譯，所以這裡只給代碼。 */
-export const ICON_NOT_SQUARE = 'craftlift:iconNotSquare'
 
 function tempPath(): string {
   return join(app.getPath('temp'), `craftlift-icon-${randomBytes(6).toString('hex')}.png`)
 }
 
 /**
- * 讀回目前的圖示，回傳可以直接放進 <img src> 的 data URL。
+ * Read the current icon back as a data URL, ready for an <img src>.
  *
- * 沒有圖示不是錯誤——大多數伺服器本來就沒有，回傳 null 讓畫面顯示空狀態。
+ * Having no icon is not an error — machines created before v1.1.0 have none,
+ * and null tells the renderer to show the default. Newer machines get a
+ * CraftLift icon written by the startup script, so they always have one.
  */
 export async function readIcon(conn: ServerConnection): Promise<string | null> {
   const local = tempPath()
@@ -48,30 +52,63 @@ export async function readIcon(conn: ServerConnection): Promise<string | null> {
 }
 
 /**
- * 換一張圖示。
+ * Measure an image.
  *
- * 剛好就是 64×64 的話原檔照送，不重新編碼——重新編碼會讓像素風的圖被
- * 重新取樣，邊緣糊掉，而那正是這類圖最不能被動到的地方。
+ * This exists because "not square — shall I crop it?" has to be asked before
+ * anything is done, and the renderer has no nativeImage. null means the file
+ * could not be read as an image.
  */
-export async function writeIcon(conn: ServerConnection, localPath: string): Promise<void> {
+export function probeIcon(localPath: string): { width: number; height: number } | null {
   const image = nativeImage.createFromPath(localPath)
+  if (image.isEmpty()) return null
+  return image.getSize()
+}
+
+/**
+ * Turn a picked image into the PNG to upload, or null to send the file as-is.
+ *
+ * A file that is already a 64×64 PNG is sent untouched rather than re-encoded:
+ * re-encoding resamples pixel art and softens its edges, which is the one
+ * thing this kind of image cannot afford.
+ *
+ * Cropping takes the largest centred square. When a user presses "crop" they
+ * mean "keep the middle" — taking a corner would cut the subject out.
+ *
+ * Split out from writeIcon so the image handling can be exercised without an
+ * SSH connection.
+ */
+export function toIconPng(localPath: string): Buffer | null {
+  let image = nativeImage.createFromPath(localPath)
   if (image.isEmpty()) throw new Error(ICON_UNREADABLE)
 
   const { width, height } = image.getSize()
-  if (width !== height) throw new Error(ICON_NOT_SQUARE)
 
+  // Already exactly what Minecraft wants: send the file untouched
+  if (width === height && width === SIZE && /\.png$/i.test(localPath)) return null
+
+  if (width !== height) {
+    const side = Math.min(width, height)
+    image = image.crop({
+      x: Math.round((width - side) / 2),
+      y: Math.round((height - side) / 2),
+      width: side,
+      height: side
+    })
+  }
+  if (image.getSize().width !== SIZE) {
+    image = image.resize({ width: SIZE, height: SIZE, quality: 'best' })
+  }
+  return image.toPNG()
+}
+
+export async function writeIcon(conn: ServerConnection, localPath: string): Promise<void> {
+  const png = toIconPng(localPath)
   let source = localPath
   let temp: string | null = null
 
-  if (width !== SIZE) {
-    const resized = image.resize({ width: SIZE, height: SIZE, quality: 'best' })
+  if (png) {
     temp = tempPath()
-    await writeFile(temp, resized.toPNG())
-    source = temp
-  } else if (!/\.png$/i.test(localPath)) {
-    // 尺寸對但不是 PNG（例如 64×64 的 jpg）——Minecraft 只讀 PNG
-    temp = tempPath()
-    await writeFile(temp, image.toPNG())
+    await writeFile(temp, png)
     source = temp
   }
 
@@ -82,6 +119,19 @@ export async function writeIcon(conn: ServerConnection, localPath: string): Prom
   }
 }
 
-export async function removeIcon(conn: ServerConnection): Promise<void> {
-  await deleteRemoteFiles(conn, [REMOTE.iconFile])
+/**
+ * Put CraftLift's default icon back.
+ *
+ * Deliberately not "delete the file": with no file, Minecraft shows its own
+ * grey block, whereas the user pressed "restore default" — and the default
+ * they have in mind is the one this app gives, the one a new server starts with.
+ */
+export async function resetIcon(conn: ServerConnection): Promise<void> {
+  const temp = tempPath()
+  try {
+    await writeFile(temp, Buffer.from(DEFAULT_SERVER_ICON_BASE64, 'base64'))
+    await uploadPath(conn, temp, REMOTE.iconFile, true)
+  } finally {
+    await rm(temp, { force: true })
+  }
 }

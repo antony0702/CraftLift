@@ -1,46 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, ServerProperties } from '@shared/types'
+import { PROPERTY_FIELDS } from '@shared/properties'
+import { DEFAULT_SERVER_ICON_DATA_URL } from '@shared/serverIcon'
 import { call, errorText } from '../../lib/api'
-import { ErrorText, Field, Loading, Modal, Waiting } from '../../components/Ui'
+import { ErrorText, Info, Loading, Modal, Waiting } from '../../components/Ui'
+import PropertyFields from '../../components/PropertyFields'
 
 /**
- * 圖形化的 server.properties 編輯器。
+ * The graphical server.properties editor.
  *
- * 只列出一般玩家真的會想改的設定，每一項都附中文說明。
- * 其他冷門設定仍然可以在「檔案」分頁裡直接編輯原始檔案。
+ * The field table is shared with the create screen (@shared/properties) so the
+ * two cannot disagree. Settings that only mean something while creating (the
+ * world seed) are filtered out here — the world already exists, so keeping the
+ * field would leave one that does nothing when you change it.
  */
-type Editor =
-  | { key: string; kind: 'text' }
-  | { key: string; kind: 'number'; min: number; max: number }
-  | { key: string; kind: 'bool' }
-  | { key: string; kind: 'select'; options: string[] }
-
-const FIELDS: Editor[] = [
-  { key: 'motd', kind: 'text' },
-  { key: 'max-players', kind: 'number', min: 1, max: 200 },
-  { key: 'difficulty', kind: 'select', options: ['peaceful', 'easy', 'normal', 'hard'] },
-  { key: 'gamemode', kind: 'select', options: ['survival', 'creative', 'adventure', 'spectator'] },
-  { key: 'pvp', kind: 'bool' },
-  { key: 'hardcore', kind: 'bool' },
-  { key: 'white-list', kind: 'bool' },
-  { key: 'online-mode', kind: 'bool' },
-  { key: 'allow-nether', kind: 'bool' },
-  { key: 'allow-flight', kind: 'bool' },
-  { key: 'spawn-monsters', kind: 'bool' },
-  { key: 'view-distance', kind: 'number', min: 3, max: 32 },
-  { key: 'simulation-distance', kind: 'number', min: 3, max: 32 },
-  { key: 'spawn-protection', kind: 'number', min: 0, max: 100 },
-  { key: 'level-seed', kind: 'text' }
-]
+const FIELDS = PROPERTY_FIELDS.filter((field) => !('createOnly' in field && field.createOnly))
 
 /**
- * 伺服器圖示。
+ * The server icon.
  *
- * 放在這一頁是因為它跟 MOTD、難度一樣是「玩家看得到的伺服器外觀」。
- * 自成一塊而不是做成上面那種 Field，因為它是圖不是文字欄位。
+ * It lives on this page because, like the MOTD and the difficulty, it is part
+ * of "what the server looks like to players". It is its own block rather than
+ * a Field, because it is a picture, not a text input.
  *
- * 尺寸檢查與縮放都在主行程，這裡只負責問、顯示、和把錯誤講清楚。
+ * Scaling and cropping happen in the main process; this only asks, shows, and
+ * states errors plainly.
  */
 function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element {
   const { t } = useTranslation()
@@ -48,12 +33,15 @@ function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  /** The picked image is not square; waiting on the user to allow cropping */
+  const [crop, setCrop] = useState<{ path: string; width: number; height: number } | null>(null)
 
   const load = useCallback(async () => {
     try {
       setIcon(await call(window.api.icon.get(server.name, server.zone)))
     } catch {
-      // 讀不到就當成沒有圖示。這一頁其他設定不該因為一張圖讀不到而擋住。
+      // Unreadable counts as no icon. The rest of this page should not be
+      // held up because one picture failed to load.
       setIcon(null)
     } finally {
       setLoading(false)
@@ -64,14 +52,11 @@ function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element 
     void load()
   }, [load])
 
-  const choose = async (): Promise<void> => {
-    setMessage('')
-    const picked = await call(window.api.icon.pick())
-    if (!picked) return
-
+  const apply = async (path: string): Promise<void> => {
+    setCrop(null)
     setBusy(true)
     try {
-      await call(window.api.icon.set(server.name, server.zone, picked))
+      await call(window.api.icon.set(server.name, server.zone, path))
       await load()
     } catch (err) {
       setMessage(errorText(err))
@@ -80,12 +65,37 @@ function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element 
     }
   }
 
-  const clear = async (): Promise<void> => {
+  /**
+   * Pick an image.
+   *
+   * Non-square images are asked about before anything happens — cropping
+   * silently decides which half to keep, and the user will notice their
+   * picture lost its head; refusing outright sends them off to find an image
+   * editor.
+   */
+  const choose = async (): Promise<void> => {
+    setMessage('')
+    const picked = await call(window.api.icon.pick())
+    if (!picked) return
+
+    const size = await call(window.api.icon.probe(picked))
+    if (!size) {
+      setMessage(t('errors.iconUnreadable'))
+      return
+    }
+    if (size.width !== size.height) {
+      setCrop({ path: picked, ...size })
+      return
+    }
+    await apply(picked)
+  }
+
+  const reset = async (): Promise<void> => {
     setBusy(true)
     setMessage('')
     try {
-      await call(window.api.icon.clear(server.name, server.zone))
-      setIcon(null)
+      await call(window.api.icon.reset(server.name, server.zone))
+      await load()
     } catch (err) {
       setMessage(errorText(err))
     } finally {
@@ -96,29 +106,47 @@ function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element 
   return (
     <div className="server-icon">
       <div className="server-icon-preview">
-        {loading ? null : icon ? (
-          <img src={icon} width={64} height={64} alt="" />
-        ) : (
-          <div className="server-icon-empty" aria-hidden />
+        {/* No icon means a machine created before v1.1.0. Show the default
+            rather than a blank, because that is exactly what "restore
+            default" would give them. */}
+        {loading ? null : (
+          <img src={icon ?? DEFAULT_SERVER_ICON_DATA_URL} width={64} height={64} alt="" />
         )}
       </div>
 
       <div className="server-icon-body">
-        <div className="label">{t('props.icon.label')}</div>
-        <p className="muted small">{t('props.icon.hint')}</p>
+        <div className="field-label">
+          {t('props.icon.label')}
+          <Info text={t('props.icon.hint')} />
+        </div>
         <div className="actions">
           <button type="button" disabled={busy} onClick={() => void choose()}>
-            {icon ? t('props.icon.replace') : t('props.icon.upload')}
+            {t('props.icon.replace')}
           </button>
-          {icon && (
-            <button type="button" className="link-btn" disabled={busy} onClick={() => void clear()}>
-              {t('props.icon.remove')}
-            </button>
-          )}
+          <button type="button" className="link-btn" disabled={busy} onClick={() => void reset()}>
+            {t('props.icon.reset')}
+          </button>
           {busy && <Waiting />}
         </div>
         <ErrorText>{message}</ErrorText>
       </div>
+
+      {crop && (
+        <Modal title={t('props.icon.cropTitle')} onClose={() => setCrop(null)}>
+          <p>{t('props.icon.cropBody')}</p>
+          <p className="muted small fact">
+            {crop.width} × {crop.height}
+          </p>
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => void apply(crop.path)}>
+              {t('props.icon.cropConfirm')}
+            </button>
+            <button type="button" className="link-btn" onClick={() => setCrop(null)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -130,10 +158,11 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [saved, setSaved] = useState(false)
-  /** 按下儲存後先問過再動手。null 代表還沒問。 */
+  /** Ask before saving. null means the question has not been put yet. */
   const [confirm, setConfirm] = useState<{ running: boolean; players: number | null } | null>(null)
   const [checking, setChecking] = useState(false)
-  /** 儲存完正在重啟。這一段有十幾秒，不講的話畫面像當掉。 */
+  /** Restarting after a save. This takes a good ten seconds, and in silence
+   *  the screen looks frozen. */
   const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
@@ -154,11 +183,12 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
   }
 
   /**
-   * 按下儲存時先問一次。
+   * Ask once, on save.
    *
-   * server.properties 只有在 Minecraft 啟動時才會被讀取，所以改完一定要重啟
-   * 才會生效。重啟會把線上的玩家踢出去，那是使用者該先知道再決定的事——
-   * 所以先查一下現在的狀態，把「會踢掉幾個人」講清楚再問。
+   * server.properties is only read when Minecraft starts, so a change means a
+   * restart. A restart disconnects everyone online, which the user deserves to
+   * know before deciding — hence checking the current state first and saying
+   * how many people it would kick.
    */
   const askBeforeSave = async (): Promise<void> => {
     setChecking(true)
@@ -167,7 +197,8 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
       const status = await call(window.api.minecraft.status(server.name, server.zone))
       setConfirm({ running: status.running, players: status.playerCount })
     } catch {
-      // 狀態查不到也還是要能存。當成沒在跑，只儲存不重啟，並在對話框裡說明。
+      // Saving must work even when the status cannot be read. Treat it as
+      // not running: save without restarting, and say so in the dialog.
       setConfirm({ running: false, players: null })
     } finally {
       setChecking(false)
@@ -175,10 +206,10 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
   }
 
   /**
-   * 儲存，接著在 Minecraft 有在跑的時候重新啟動它。
+   * Save, then restart Minecraft if it is running.
    *
-   * 沒在跑就只儲存——重啟一個停著的服務等於把它開起來，那不是使用者按下
-   * 「儲存」時想要的事。
+   * If it is not running, only save — restarting a stopped service means
+   * starting it, which is not what anyone means by pressing "save".
    */
   const save = async (restart: boolean): Promise<void> => {
     setConfirm(null)
@@ -208,58 +239,9 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
 
   return (
     <div className="properties">
-      <p className="muted small">{t('props.restartNote')}</p>
-
       <ServerIcon server={server} />
 
-      {FIELDS.map((field) => {
-        const value = props[field.key] ?? ''
-        const label = t(`props.fields.${field.key}.label`)
-        const hint = t(`props.fields.${field.key}.hint`)
-
-        if (field.kind === 'bool') {
-          return (
-            <label className="checkbox" key={field.key}>
-              <input
-                type="checkbox"
-                checked={value === 'true'}
-                onChange={(e) => update(field.key, String(e.target.checked))}
-              />
-              <span>
-                {label} <span className="muted small">— {hint}</span>
-              </span>
-            </label>
-          )
-        }
-
-        return (
-          <Field key={field.key} label={label} hint={hint}>
-            {field.kind === 'select' ? (
-              <select value={value} onChange={(e) => update(field.key, e.target.value)}>
-                {field.options.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {t(`props.values.${opt}`, opt)}
-                  </option>
-                ))}
-              </select>
-            ) : field.kind === 'number' ? (
-              <input
-                type="number"
-                min={field.min}
-                max={field.max}
-                value={value}
-                onChange={(e) => update(field.key, e.target.value)}
-              />
-            ) : (
-              <input
-                type="text"
-                value={value}
-                onChange={(e) => update(field.key, e.target.value)}
-              />
-            )}
-          </Field>
-        )
-      })}
+      <PropertyFields fields={FIELDS} values={props} onChange={update} />
 
       <ErrorText>{message}</ErrorText>
 
@@ -284,7 +266,7 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
 
       {confirm && (
         <Modal
-          /* 沒在跑就不會重啟，標題也不該那樣寫 */
+          /* Nothing restarts when it is stopped, so the title should not say so */
           title={confirm.running ? t('props.confirmTitle') : t('props.confirmTitleStopped')}
           onClose={() => setConfirm(null)}
         >

@@ -140,6 +140,14 @@ export interface CreateServerOptions {
   zone: string
   diskGb: number
   useStaticIp: boolean
+  /**
+   * The server.properties decided at creation time.
+   *
+   * Asked there so that the first thing a user does with a new server is not
+   * changing settings and sitting through another restart — one they would hit
+   * right after waiting out the build. An empty object means "all defaults".
+   */
+  properties: ServerProperties
   /** 使用者是否已勾選費用免責聲明。未勾選時主行程會直接拒絕。 */
   acceptedDisclaimer: boolean
 }
@@ -301,6 +309,14 @@ export interface Preferences {
   backupIntervalHours: number
   /** 關機前自動把備份拉回本機 */
   backupToLocalOnShutdown: boolean
+  /**
+   * Remind, after a mod is switched off, that it takes a restart to be real.
+   *
+   * The reminder carries a "don't remind me again" tick. Stored as a
+   * preference rather than component state: dismissed-for-now would come back
+   * on the next launch, which is not what the user asked for.
+   */
+  remindModRestart: boolean
   /** 本機備份存放位置，null 表示使用預設的「文件」資料夾 */
   localBackupDir: string | null
   /**

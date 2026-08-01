@@ -42,26 +42,39 @@ export const REMOTE = {
 export const BACKUP_KEEP = 5
 
 /**
- * 機型方案。
+ * The simple-mode plans.
  *
- * 刻意用「幾個人一起玩」當作選擇依據，而不是叫使用者去看懂 e2-standard-2
- * 是什麼意思。這裡不標任何金額——估價算錯比不估更糟，UI 上改成提供
- * 連結讓使用者去看 Google 官方的即時費用。
+ * Deliberately chosen by "how many people will play" rather than asking the
+ * user to work out what c3d-standard-4 means. No prices here — a wrong
+ * estimate is worse than none, so the UI links to Google's own live figures.
  *
- * jvmHeap 保留約 1/4 記憶體給作業系統與 JVM 本身的非堆積開銷，
- * 全部給堆積會讓系統在尖峰時被 OOM killer 砍掉。
+ * Why C2D/C3D rather than the E2 machines this used to offer: Minecraft runs
+ * almost entirely on one core, and E2 is the shared-core family with the
+ * weakest single-core performance. Measured on real servers, 5–10 players need
+ * c3d-standard-4; the e2-standard-2 the standard plan used to give was clearly
+ * not enough.
+ *
+ * machineTypes is a preference-ordered list of candidates rather than one
+ * name, because not every zone has every family — Tokyo has no C3D at all
+ * today. Creation picks the first one the zone actually offers; every
+ * candidate for a plan has the same cpus and memory, so the spec shown to the
+ * user is true whichever is chosen.
+ *
+ * jvmHeap leaves about a quarter of memory to the OS and to the JVM's own
+ * non-heap overhead. Giving it all to the heap gets the machine killed by the
+ * OOM killer at peak.
  */
 export interface Tier {
   id: 'small' | 'standard' | 'large'
-  machineType: string
+  machineTypes: string[]
   cpus: number
   ramGb: number
 }
 
 export const TIERS: Tier[] = [
-  { id: 'small', machineType: 'e2-medium', cpus: 2, ramGb: 4 },
-  { id: 'standard', machineType: 'e2-standard-2', cpus: 2, ramGb: 8 },
-  { id: 'large', machineType: 'e2-standard-4', cpus: 4, ramGb: 16 }
+  { id: 'small', machineTypes: ['c2d-standard-2'], cpus: 2, ramGb: 8 },
+  { id: 'standard', machineTypes: ['c3d-standard-4', 'c2d-standard-4'], cpus: 4, ramGb: 16 },
+  { id: 'large', machineTypes: ['c3d-standard-8', 'c2d-standard-8'], cpus: 8, ramGb: 32 }
 ]
 
 export const DEFAULT_TIER = 'standard'

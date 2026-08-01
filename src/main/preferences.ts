@@ -12,6 +12,7 @@ const DEFAULTS: Preferences = {
   launchAtLogin: true,
   backupIntervalHours: 6,
   backupToLocalOnShutdown: true,
+  remindModRestart: true,
   localBackupDir: null,
   lastProjectId: null
 }

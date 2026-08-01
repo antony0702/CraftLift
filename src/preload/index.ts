@@ -131,7 +131,11 @@ const api = {
       invoke('icon:get', name, zone),
     set: (name: string, zone: string, localPath: string): Promise<Result<void>> =>
       invoke('icon:set', name, zone, localPath),
-    clear: (name: string, zone: string): Promise<Result<void>> => invoke('icon:clear', name, zone),
+    /** 換回 CraftLift 的預設圖示（不是刪掉檔案——那會變成 Minecraft 的灰方塊） */
+    reset: (name: string, zone: string): Promise<Result<void>> => invoke('icon:reset', name, zone),
+    /** 量尺寸，畫面靠它決定要不要問「不是正方形，要幫你裁嗎」 */
+    probe: (localPath: string): Promise<Result<{ width: number; height: number } | null>> =>
+      invoke('icon:probe', localPath),
     /** 開圖片選擇視窗，回傳本機路徑；取消時是 null */
     pick: (): Promise<Result<string | null>> => invoke('icon:pick')
   },

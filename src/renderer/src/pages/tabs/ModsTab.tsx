@@ -88,6 +88,31 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   const [confirmRestart, setConfirmRestart] = useState<{ players: number | null } | null>(null)
   const [restarting, setRestarting] = useState(false)
 
+  /**
+   * Reminder shown after switching a mod off.
+   *
+   * Unticking a mod looks instant, but the running Minecraft has it loaded
+   * until the next restart — so the checkbox says one thing and the game says
+   * another. "Don't remind me again" lives in preferences, not in this
+   * component: dismissed-for-this-visit would come back on the next launch.
+   */
+  const [disabledNotice, setDisabledNotice] = useState(false)
+  const [remind, setRemind] = useState(true)
+  /** The tick inside that reminder */
+  const [dontRemind, setDontRemind] = useState(false)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const prefs = await call(window.api.app.getPreferences())
+        setRemind(prefs.remindModRestart)
+      } catch {
+        // Preferences unreadable: keep reminding. Better one dialog too many
+        // than a mod that is silently still loaded.
+      }
+    })()
+  }, [])
+
   const listRef = useRef<HTMLDivElement>(null)
   const conflictAnswer = useRef<((choice: ConflictChoice | null) => void) | null>(null)
 
@@ -219,7 +244,23 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
       )
       // 狀態由 load() 從機器上的時間戳重新算，這裡不自己記
       await load()
+      // Only on the way off. Enabling a mod has the same restart rule, but the
+      // banner above already says so, and a dialog on every tick would be noise.
+      if (!enabled && remind) setDisabledNotice(true)
     })
+  }
+
+  /** Close the reminder, and honour "don't remind me again" across launches. */
+  const dismissDisabledNotice = async (): Promise<void> => {
+    setDisabledNotice(false)
+    if (!dontRemind) return
+    setRemind(false)
+    try {
+      await call(window.api.app.setPreferences({ remindModRestart: false }))
+    } catch {
+      // A failed save is not worth an error message here — the worst case is
+      // that the reminder comes back next time.
+    }
   }
 
   /** 雙擊與 Enter 的主要動作。跟檔案總管一樣，一次只對「這一個」動作。 */
@@ -362,7 +403,7 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
   // --- 鍵盤 -----------------------------------------------------------------
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
-    if (confirming || conflict || details || confirmRestart) return
+    if (confirming || conflict || details || confirmRestart || disabledNotice) return
 
     const chosen = selectedMods
     const single = chosen.length === 1 ? chosen[0] : null
@@ -735,6 +776,34 @@ export default function ModsTab({ server }: { server: MinecraftServer }): React.
             <dt>{t('mods.columns.modified')}</dt>
             <dd className="fact">{formatTime(details.modifiedAt)}</dd>
           </dl>
+        </Modal>
+      )}
+
+      {/* Unticking a mod looks like it took effect immediately. It did not —
+          the running Minecraft keeps it loaded until the next restart. */}
+      {disabledNotice && (
+        <Modal
+          title={t('mods.disabledNoticeTitle')}
+          onClose={() => void dismissDisabledNotice()}
+        >
+          <p>{t('mods.disabledNotice')}</p>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={dontRemind}
+              onChange={(e) => setDontRemind(e.target.checked)}
+            />
+            <span>{t('mods.dontRemind')}</span>
+          </label>
+          <div className="actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => void dismissDisabledNotice()}
+            >
+              {t('common.gotIt')}
+            </button>
+          </div>
         </Modal>
       )}
 

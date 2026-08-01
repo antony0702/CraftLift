@@ -306,6 +306,14 @@ button.bare:hover:not(:disabled) {
   background: none;
   color: var(--bone);
 }
+/* Arrow and label on one optical line. Laid out inline, the svg sits on the
+   text baseline, which drops the label a couple of pixels below the arrow's
+   centre — small, but visible against an 11px grid. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 button.small {
   font-size: 11px;
   line-height: 11px;
@@ -1077,6 +1085,19 @@ button.danger:hover:not(:disabled) {
   margin: 22px 0;
 }
 
+/* The Minecraft settings on the create page. Ruled off top and bottom rather
+   than boxed: it is a stretch of the same form, not a sidebar of extras. */
+.game-settings {
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  padding: 22px 0;
+  margin: 33px 0;
+}
+.game-settings > .field-label {
+  margin-bottom: 11px;
+  color: var(--bone);
+}
+
 /* ── 模組 ─────────────────────────────────────────────────────
    載入器的三張卡片沿用方案卡片的版面。它們是同一件事——「挑一個，
    每個附一句話說明差別」——沒有理由發明第二種樣子。 */
@@ -1406,11 +1427,15 @@ button.danger:hover:not(:disabled) {
 .backup-group {
   margin-top: 33px;
 }
+/* These two headings name what a whole section is, so they get the heading
+   size (22px) rather than body size. The bitmap face is the default here —
+   nothing to set, and it is the right one: these are words, not machine facts. */
 .backup-group h3 {
-  font-size: 11px;
-  font-weight: normal;
   margin: 0;
   color: var(--bone);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 /* 每一區的標題與自己的備份按鈕同一列 */
 .backup-group .toolbar {
