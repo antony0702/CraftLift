@@ -29,6 +29,19 @@ function createWindow(show = true): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
+    /**
+     * 無邊框，但保留系統的非工作區行為。
+     *
+     * 用 'hidden' 而不是 frame: false：前者只是把標題列藏起來，Windows
+     * 仍然把這個視窗當成有邊框的視窗看待，所以拖到螢幕邊緣會貼齊
+     * （Aero Snap）、四邊與四角可以縮放、右鍵拖曳區會跳系統選單、
+     * 在拖曳區上雙擊會最大化——這些全部不必自己寫。frame: false 會
+     * 一併拿掉這些，然後就得用 JS 重做一份永遠比不上原生的替代品。
+     *
+     * 沒有設 titleBarOverlay，因為那會讓 Windows 自己畫那三顆按鈕，
+     * 跟這套點陣介面格格不入。按鈕由畫面那端自己畫。
+     */
+    titleBarStyle: 'hidden',
     icon: join(__dirname, '../../build/icon.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -40,6 +53,15 @@ function createWindow(show = true): void {
   })
 
   bindZoomTarget(mainWindow)
+
+  // 中間那顆按鈕在「最大化」與「還原」之間換圖示。狀態不是只有按鈕會
+  // 改變——拖到螢幕頂端貼齊、雙擊拖曳區、Win+↑ 都會改，所以聽視窗的事件，
+  // 不要在按下按鈕時自己記。
+  const sendMaximized = (maximized: boolean) => (): void => {
+    mainWindow?.webContents.send('window:maximized', maximized)
+  }
+  mainWindow.on('maximize', sendMaximized(true))
+  mainWindow.on('unmaximize', sendMaximized(false))
 
   mainWindow.on('ready-to-show', () => {
     if (show) mainWindow?.show()

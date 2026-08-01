@@ -280,16 +280,20 @@ if [ "$WHAT" = "setup" ] || [ "$WHAT" = "all" ]; then
 #
 # 所以只有內容真的變了才重打。判斷依據是「檔名＋大小＋修改時間」的清單，
 # 不對檔案內容算雜湊——對幾百 MB 的模組算 sha256 比重打包還慢。
+# 這張清單同時決定「有沒有變」與「要打包什麼」，所以只寫一次。
+# server-icon.png 也在裡面：它是使用者自己上傳的東西，機器沒了就沒了。
+SETUP_FILES="server.properties whitelist.json ops.json banned-players.json server-icon.png"
+
 SIG_FILE="$DIR/.craftlift-setup-sig"
 SIG=$( { find "$DIR/mods" -type f -printf '%P\\t%s\\t%T@\\n' 2>/dev/null | sort
-         for f in server.properties whitelist.json ops.json banned-players.json; do
+         for f in $SETUP_FILES; do
            [ -f "$DIR/$f" ] && stat -c '%n %s %Y' "$DIR/$f"
          done
        } | md5sum | cut -d' ' -f1 )
 
 if [ "$SIG" != "$(cat "$SIG_FILE" 2>/dev/null)" ] || [ "$FORCE" = "force" ]; then
   CONFIGS=""
-  for f in server.properties whitelist.json ops.json banned-players.json; do
+  for f in $SETUP_FILES; do
     [ -f "$DIR/$f" ] && CONFIGS="$CONFIGS $f"
   done
   # mods 在原版伺服器上不存在，這時候這一包就只有設定檔，一樣有價值

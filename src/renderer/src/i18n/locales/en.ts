@@ -4,6 +4,22 @@ export default {
     tagline: 'Host your own Minecraft server on Google Cloud'
   },
   nav: { settings: 'Settings' },
+  window: {
+    minimize: 'Minimise',
+    maximize: 'Maximise',
+    restore: 'Restore',
+    close: 'Close'
+  },
+  errors: {
+    projectMissing:
+      'Your Google Cloud project could not be found — it may have been deleted. CraftLift will look again when you refresh.',
+    permissionDenied:
+      'This Google account is not allowed to do that. Check that you are signed in with the account that created these servers.',
+    apiDisabled:
+      'A Google Cloud service CraftLift needs is not enabled yet. Run the first-time setup again from Settings.',
+    iconNotSquare: 'Square images only. Crop this one to a square first, then upload it again.',
+    iconUnreadable: 'That file could not be read as an image. Try a different one.'
+  },
   common: {
     error: 'Something went wrong',
     retry: 'Retry',
@@ -343,6 +359,13 @@ export default {
   },
   props: {
     restartNote: 'Saving restarts Minecraft so changes take effect. You will be asked first.',
+    icon: {
+      label: 'Server icon',
+      hint: 'The small image players see in their multiplayer list. Square images only — it is scaled to 64×64 for you. Restart Minecraft for a new icon to take effect.',
+      upload: 'Upload image',
+      replace: 'Replace image',
+      remove: 'Remove'
+    },
     saved: 'Saved',
     checking: 'Checking…',
     restarting: 'Restarting…',

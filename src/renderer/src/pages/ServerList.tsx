@@ -42,7 +42,13 @@ export default function ServerList({
     void refresh()
     // 開關機要花一兩分鐘，定期重讀讓狀態自己跟上
     const timer = setInterval(() => void refresh(), 15_000)
-    return () => clearInterval(timer)
+    // 啟動時是先用記住的專案去查的。那個專案如果已經不存在，上面這一次
+    // 會失敗並留下一行錯誤；背景核對完成後重來一次，錯誤就會自己消失。
+    const stop = window.api.project.onChanged(() => void refresh())
+    return () => {
+      clearInterval(timer)
+      stop()
+    }
   }, [refresh])
 
   // 只問正在執行的那幾台。連線本身要好幾秒，查不到就不顯示人數，

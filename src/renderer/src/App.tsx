@@ -4,7 +4,7 @@ import type { MinecraftServer } from '@shared/types'
 import { call } from './lib/api'
 import { useTheme } from './lib/theme'
 import { useUpdate } from './lib/update'
-import { Gear } from './components/Icons'
+import { Gear, WinClose, WinMaximize, WinMinimize, WinRestore } from './components/Icons'
 import UpdateNotice from './components/UpdateNotice'
 import Setup from './pages/Setup'
 import ServerList from './pages/ServerList'
@@ -19,6 +19,57 @@ type Route =
   | { name: 'create' }
   | { name: 'detail'; server: MinecraftServer }
   | { name: 'settings' }
+
+/**
+ * 視窗的最小化／最大化／關閉。
+ *
+ * 只有這三件事需要程式碼。移動、貼齊、四邊縮放、雙擊標題列最大化、
+ * 右鍵系統選單都是 Windows 自己做的——標題列在 CSS 裡標成拖曳區就有了。
+ *
+ * 最大化狀態聽主行程的事件而不是按下按鈕時自己記：使用者也可能用
+ * 拖到螢幕頂端、Win+↑ 或雙擊來改變它，那些都不經過這裡。
+ */
+function WindowControls(): React.JSX.Element {
+  const { t } = useTranslation()
+  const [maximized, setMaximized] = useState(false)
+
+  useEffect(() => {
+    void window.api.window.isMaximized().then((r) => {
+      if (r.ok) setMaximized(r.data)
+    })
+    return window.api.window.onMaximizedChange(setMaximized)
+  }, [])
+
+  return (
+    <div className="window-controls">
+      <button
+        type="button"
+        title={t('window.minimize')}
+        aria-label={t('window.minimize')}
+        onClick={() => void window.api.window.minimize()}
+      >
+        <WinMinimize />
+      </button>
+      <button
+        type="button"
+        title={maximized ? t('window.restore') : t('window.maximize')}
+        aria-label={maximized ? t('window.restore') : t('window.maximize')}
+        onClick={() => void window.api.window.toggleMaximize()}
+      >
+        {maximized ? <WinRestore /> : <WinMaximize />}
+      </button>
+      <button
+        type="button"
+        className="close"
+        title={t('window.close')}
+        aria-label={t('window.close')}
+        onClick={() => void window.api.window.close()}
+      >
+        <WinClose />
+      </button>
+    </div>
+  )
+}
 
 export default function App(): React.JSX.Element {
   const { t, i18n } = useTranslation()
@@ -89,6 +140,8 @@ export default function App(): React.JSX.Element {
             <Gear />
           </button>
         )}
+
+        <WindowControls />
       </div>
 
       <UpdateNotice

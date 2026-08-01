@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MinecraftServer, ServerProperties } from '@shared/types'
 import { call, errorText } from '../../lib/api'
@@ -33,6 +33,95 @@ const FIELDS: Editor[] = [
   { key: 'spawn-protection', kind: 'number', min: 0, max: 100 },
   { key: 'level-seed', kind: 'text' }
 ]
+
+/**
+ * 伺服器圖示。
+ *
+ * 放在這一頁是因為它跟 MOTD、難度一樣是「玩家看得到的伺服器外觀」。
+ * 自成一塊而不是做成上面那種 Field，因為它是圖不是文字欄位。
+ *
+ * 尺寸檢查與縮放都在主行程，這裡只負責問、顯示、和把錯誤講清楚。
+ */
+function ServerIcon({ server }: { server: MinecraftServer }): React.JSX.Element {
+  const { t } = useTranslation()
+  const [icon, setIcon] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setIcon(await call(window.api.icon.get(server.name, server.zone)))
+    } catch {
+      // 讀不到就當成沒有圖示。這一頁其他設定不該因為一張圖讀不到而擋住。
+      setIcon(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [server.name, server.zone])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const choose = async (): Promise<void> => {
+    setMessage('')
+    const picked = await call(window.api.icon.pick())
+    if (!picked) return
+
+    setBusy(true)
+    try {
+      await call(window.api.icon.set(server.name, server.zone, picked))
+      await load()
+    } catch (err) {
+      setMessage(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const clear = async (): Promise<void> => {
+    setBusy(true)
+    setMessage('')
+    try {
+      await call(window.api.icon.clear(server.name, server.zone))
+      setIcon(null)
+    } catch (err) {
+      setMessage(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="server-icon">
+      <div className="server-icon-preview">
+        {loading ? null : icon ? (
+          <img src={icon} width={64} height={64} alt="" />
+        ) : (
+          <div className="server-icon-empty" aria-hidden />
+        )}
+      </div>
+
+      <div className="server-icon-body">
+        <div className="label">{t('props.icon.label')}</div>
+        <p className="muted small">{t('props.icon.hint')}</p>
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={() => void choose()}>
+            {icon ? t('props.icon.replace') : t('props.icon.upload')}
+          </button>
+          {icon && (
+            <button type="button" className="link-btn" disabled={busy} onClick={() => void clear()}>
+              {t('props.icon.remove')}
+            </button>
+          )}
+          {busy && <Waiting />}
+        </div>
+        <ErrorText>{message}</ErrorText>
+      </div>
+    </div>
+  )
+}
 
 export default function PropertiesTab({ server }: { server: MinecraftServer }): React.JSX.Element {
   const { t } = useTranslation()
@@ -120,6 +209,8 @@ export default function PropertiesTab({ server }: { server: MinecraftServer }): 
   return (
     <div className="properties">
       <p className="muted small">{t('props.restartNote')}</p>
+
+      <ServerIcon server={server} />
 
       {FIELDS.map((field) => {
         const value = props[field.key] ?? ''
