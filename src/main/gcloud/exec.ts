@@ -165,8 +165,27 @@ function classify(stderr: string): string | null {
   if (/PERMISSION_DENIED|Permission denied|not authorized/i.test(stderr)) {
     return `${GCLOUD_ERROR_PREFIX}permissionDenied`
   }
+  // Every server reserves a static address, and four per region is the quota a
+  // trial account meets first — so this is the failure users actually hit, and
+  // it is worth its own message because the way out (delete an old server, or
+  // switch to a floating address) is not guessable from Google's wording.
+  if (/Quota 'IN_USE_ADDRESSES' exceeded/i.test(stderr)) {
+    return `${GCLOUD_ERROR_PREFIX}addressQuota`
+  }
+  if (/Quota '[A-Z_]+' exceeded|QUOTA_EXCEEDED/i.test(stderr)) {
+    return `${GCLOUD_ERROR_PREFIX}quotaExceeded`
+  }
   return null
 }
+
+/**
+ * gcloud's own headline, which says nothing.
+ *
+ * "Could not fetch resource:" is printed as a title with the real reason on the
+ * lines below it, so taking the first line hands the user a sentence with no
+ * information in it — that is exactly what a blocked create looked like.
+ */
+const GCLOUD_BANNER = /^ERROR:|Could not fetch resource|Some requests did not succeed|^WARNING:/i
 
 /** 把 gcloud 的多行警告壓成一句話。細節那一行比開頭的橫幅有用。 */
 function describeFailure(stderr: string): string {
@@ -177,11 +196,16 @@ function describeFailure(stderr: string): string {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-  const detail = lines.find((line) =>
+  const known = lines.find((line) =>
     /was not found|PERMISSION_DENIED|Permission denied|has not been used in project/i.test(line)
   )
+  // Anything that is not the banner beats the banner
+  const detail = known ?? lines.find((line) => !GCLOUD_BANNER.test(line))
   return (detail ?? lines[0] ?? 'gcloud 查詢失敗').replace(/^[-\s]+/, '')
 }
+
+/** Exposed for tests: turning gcloud's noise into one line is worth checking. */
+export const describeFailureForTest = describeFailure
 
 /** 執行 gcloud 並把 JSON 輸出解析好 */
 export async function runGcloudJson<T>(args: GcloudArg[]): Promise<T> {

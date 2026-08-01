@@ -4,7 +4,7 @@ import type { MinecraftServer } from '@shared/types'
 import { call } from './lib/api'
 import { useTheme } from './lib/theme'
 import { useUpdate } from './lib/update'
-import { Gear, WinClose, WinMaximize, WinMinimize, WinRestore } from './components/Icons'
+import { Sliders, WinClose, WinMaximize, WinMinimize, WinRestore } from './components/Icons'
 import UpdateNotice from './components/UpdateNotice'
 import Setup from './pages/Setup'
 import ServerList from './pages/ServerList'
@@ -137,7 +137,7 @@ export default function App(): React.JSX.Element {
             aria-label={t('nav.settings')}
             onClick={() => setRoute({ name: 'settings' })}
           >
-            <Gear />
+            <Sliders />
           </button>
         )}
 

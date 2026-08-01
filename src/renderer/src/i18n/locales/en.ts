@@ -17,8 +17,10 @@ export default {
       'This Google account is not allowed to do that. Check that you are signed in with the account that created these servers.',
     apiDisabled:
       'A Google Cloud service CraftLift needs is not enabled yet. Run the first-time setup again from Settings.',
-    iconNotSquare: 'Square images only. Crop this one to a square first, then upload it again.',
-    iconUnreadable: 'That file could not be read as an image. Try a different one.'
+    iconUnreadable: 'That file could not be read as an image. Try a different one.',
+    addressQuota:
+      'This region is at Google’s limit for static addresses. Delete a server you no longer use, or switch to a floating address under advanced settings.',
+    quotaExceeded: 'Google Cloud is at its usage limit — nothing more can be created in this region.'
   },
   common: {
     error: 'Something went wrong',
@@ -30,7 +32,8 @@ export default {
     saving: 'Saving…',
     delete: 'Delete',
     back: 'Back',
-    refresh: 'Refresh'
+    refresh: 'Refresh',
+    gotIt: 'Got it'
   },
   state: {
     PROVISIONING: 'Provisioning',
@@ -176,6 +179,7 @@ export default {
     disclaimerNote:
       'A trial account is never charged — resources stop when the credit runs out, unless you upgrade to a paid account yourself. Google’s policy may change; their terms govern.',
     submit: 'Create server',
+    gameSettings: 'Minecraft settings',
     tiers: {
       small: { name: 'Small', players: '2–4 players' },
       standard: { name: 'Standard', players: '5–10 players' },
@@ -224,6 +228,10 @@ export default {
     someSkipped_other: '{{count}} files were not .jar files and were skipped.',
     restartNote: 'Mods are only loaded when Minecraft starts.',
     needRestart: 'Mods changed — restart Minecraft for it to take effect.',
+    disabledNoticeTitle: 'Mod disabled',
+    disabledNotice:
+      'The running Minecraft still has it loaded. It is only really off after a restart.',
+    dontRemind: 'Don’t remind me again',
     restartNow: 'Restart',
     restarting: 'Restarting…',
     confirmRestart:
@@ -353,18 +361,17 @@ export default {
     conflictSkip: 'Skip',
     detailsTitle: 'Properties',
     detailsPath: 'Location',
-    jarHint:
-      'Advanced: you can upload your own server jar (Paper, Fabric, …) named server.jar to replace Vanilla. This is unsupported — if it breaks, restoring it is up to you.',
     restartHint: 'Restart Minecraft for changes to take effect.'
   },
   props: {
-    restartNote: 'Saving restarts Minecraft so changes take effect. You will be asked first.',
     icon: {
       label: 'Server icon',
-      hint: 'The small image players see in their multiplayer list. Square images only — it is scaled to 64×64 for you. Restart Minecraft for a new icon to take effect.',
-      upload: 'Upload image',
+      hint: 'The image shown in the multiplayer list',
       replace: 'Replace image',
-      remove: 'Remove'
+      reset: 'Restore default',
+      cropTitle: 'This image is not square',
+      cropBody: 'Square images only. Crop it automatically?',
+      cropConfirm: 'Crop and apply'
     },
     saved: 'Saved',
     checking: 'Checking…',
@@ -391,7 +398,7 @@ export default {
       'max-players': { label: 'Player limit', hint: 'How many people can be online at once.' },
       difficulty: { label: 'Difficulty', hint: 'Affects mob strength and hunger drain.' },
       gamemode: { label: 'Default game mode', hint: 'Mode new players join in.' },
-      pvp: { label: 'Allow player combat', hint: 'Turn off so players cannot hurt each other.' },
+      pvp: { label: 'Block player combat', hint: 'Tick so players cannot hurt each other.' },
       hardcore: { label: 'Hardcore', hint: 'Death turns the player into a spectator permanently.' },
       'white-list': {
         label: 'Enable whitelist',
@@ -401,12 +408,14 @@ export default {
         label: 'Verify accounts with Mojang',
         hint: 'Only genuine Minecraft accounts can connect. Turning this off is a security risk and allows impersonation.'
       },
-      'allow-nether': { label: 'Allow the Nether', hint: 'Turn off to block Nether portals.' },
       'allow-flight': {
         label: 'Allow flight',
         hint: 'Turning it off kicks flying players, but can also false-positive with some mods.'
       },
-      'spawn-monsters': { label: 'Spawn monsters', hint: 'Turn off for no zombies, creepers, etc.' },
+      'enable-command-block': {
+        label: 'Allow command blocks',
+        hint: 'Used by adventure maps and redstone builds; not needed for ordinary survival.'
+      },
       'view-distance': {
         label: 'View distance',
         hint: 'How far players can see. Higher costs more CPU — lower it when many people play.'
@@ -451,22 +460,18 @@ export default {
     keepNote:
       'The newest {{count}} of each kind are kept automatically; older ones are deleted to save space.',
     interval: 'Automatic backup interval (hours)',
-    intervalHint:
-      'The server backs the world up on this schedule, asking Minecraft to flush data to disk first.',
-    intervalScope:
-      'This interval covers the world only. Server setup is not backed up on a schedule — a new copy appears only after something changes, so nothing is stored twice.',
+    intervalHint: 'This applies to world backups only, not to server setup or mods.',
     empty: '(no backups yet)',
     saveToPc: 'Download to PC',
     groups: {
       world: {
         title: 'World',
-        desc: 'Your save. Backed up automatically on the interval above.',
         createNow: 'Back up world now',
         packing: 'Packing the world'
       },
       setup: {
         title: 'Server setup',
-        desc: 'Mods, server settings, whitelist and operators. The automatic copy only appears after something changes; pressing the button always stores the current state.',
+        hint: 'Server setup is only backed up after it changes.',
         createNow: 'Back up setup now',
         packing: 'Packing the setup'
       }

@@ -697,7 +697,6 @@ export default function FilesTab({ server }: { server: MinecraftServer }): React
         </button>
       </div>
 
-      <p className="muted small">{t('files.jarHint')}</p>
       <ErrorText>{message}</ErrorText>
       {saved && (
         <p className="small">

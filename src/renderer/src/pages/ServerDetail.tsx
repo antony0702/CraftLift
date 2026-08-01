@@ -112,8 +112,9 @@ export default function ServerDetail({
   return (
     <>
       <div style={{ padding: '22px 33px 0' }}>
-        <button type="button" className="bare" onClick={onBack}>
-          <Back /> {t('common.back')}
+        <button type="button" className="bare back-link" onClick={onBack}>
+          <Back />
+          {t('common.back')}
         </button>
       </div>
 

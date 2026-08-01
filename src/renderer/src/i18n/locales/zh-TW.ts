@@ -16,8 +16,10 @@ export default {
     projectMissing: '找不到你的 Google Cloud 專案，它可能已經被刪除了。重新整理後 CraftLift 會再找一次。',
     permissionDenied: '這個 Google 帳號沒有權限做這件事。請確認登入的是建立這些伺服器的那個帳號。',
     apiDisabled: 'Google Cloud 的必要服務還沒啟用。請到設定重新執行一次初始設定。',
-    iconNotSquare: '只支援正方形的圖片。這張圖不是正方形，請先自己裁成方的再上傳。',
-    iconUnreadable: '這個檔案讀不出來，請換一張圖片。'
+    iconUnreadable: '這個檔案讀不出來，請換一張圖片。',
+    addressQuota:
+      '這個機房的固定 IP 已達 Google 的數量上限。請先刪除用不到的伺服器，或在進階設定改用浮動 IP。',
+    quotaExceeded: '已達 Google Cloud 的用量上限，這個機房目前無法再建立資源。'
   },
   common: {
     error: '發生錯誤',
@@ -29,7 +31,8 @@ export default {
     saving: '儲存中…',
     delete: '刪除',
     back: '返回',
-    refresh: '重新整理'
+    refresh: '重新整理',
+    gotIt: '知道了'
   },
   state: {
     PROVISIONING: '準備中',
@@ -168,6 +171,7 @@ export default {
     disclaimerNote:
       '試用狀態下不會被扣款——額度用完資源就停止，除非你自己升級成付費帳戶。這是 Google 的政策，可能變更，以官方公告為準。',
     submit: '建立伺服器',
+    gameSettings: 'Minecraft 設定',
     tiers: {
       small: { name: '小型', players: '2–4 人' },
       standard: { name: '標準', players: '5–10 人' },
@@ -211,6 +215,9 @@ export default {
     someSkipped: '有 {{count}} 個不是 .jar，已略過。',
     restartNote: '模組在 Minecraft 啟動時才會載入。',
     needRestart: '模組已變更，重新啟動 Minecraft 才會生效。',
+    disabledNoticeTitle: '已停用這個模組',
+    disabledNotice: '目前執行中的 Minecraft 仍載入著它，重新啟動後才會真的停用。',
+    dontRemind: '別再提醒我',
     restartNow: '重新啟動',
     restarting: '重新啟動中…',
     confirmRestart: 'Minecraft 會重新啟動，約一分鐘內連不上。世界存檔不受影響。',
@@ -333,18 +340,17 @@ export default {
     conflictSkip: '略過',
     detailsTitle: '內容',
     detailsPath: '位置',
-    jarHint:
-      '進階用法：你可以上傳自己的伺服器主程式（例如 Paper 或 Fabric 的 jar）並命名為 server.jar 來取代原版。這屬於自行負責的操作，出問題請自行還原。',
     restartHint: '存檔後需要重新啟動 Minecraft 才會生效。'
   },
   props: {
-    restartNote: '存檔後會重新啟動 Minecraft 才會生效，按下儲存時會先問你。',
     icon: {
       label: '伺服器圖示',
-      hint: '玩家在多人遊戲清單裡看到的那張小圖。只收正方形的圖片，會自動縮成 64×64。換過之後要重新啟動 Minecraft 才會生效。',
-      upload: '上傳圖片',
+      hint: '遊戲清單中的伺服器圖片',
       replace: '更換圖片',
-      remove: '移除'
+      reset: '回復預設',
+      cropTitle: '圖片不是正方形',
+      cropBody: '僅支援正方形圖片，是否要進行自動裁切？',
+      cropConfirm: '裁切並套用'
     },
     saved: '已儲存',
     checking: '確認中…',
@@ -370,16 +376,15 @@ export default {
       'max-players': { label: '人數上限', hint: '同時最多能有幾個人在線上。' },
       difficulty: { label: '難度', hint: '影響怪物強度與飢餓值消耗。' },
       gamemode: { label: '預設遊戲模式', hint: '新玩家加入時的模式。' },
-      pvp: { label: '允許玩家互相攻擊', hint: '關掉就無法打到隊友。' },
+      pvp: { label: '禁止玩家互相攻擊', hint: '勾選後打不到隊友。' },
       hardcore: { label: '極限模式', hint: '死亡後直接變成旁觀者，無法復活。' },
-      'white-list': { label: '啟用白名單', hint: '開啟後只有名單上的人能進來，防止陌生人亂入。' },
+      'white-list': { label: '啟用白名單', hint: '只有名單上的人能進來，防止陌生人亂入。' },
       'online-mode': {
         label: '驗證正版帳號',
-        hint: '開啟時只有正版 Minecraft 帳號能連線。關閉會有安全風險，也可能被人冒名。'
+        hint: '只有正版 Minecraft 帳號能連線。關閉會有安全風險，也可能被人冒名。'
       },
-      'allow-nether': { label: '開放地獄', hint: '關掉的話玩家無法進入地獄。' },
       'allow-flight': { label: '允許飛行', hint: '關掉的話飛行外掛會被踢，但某些模組也會誤判。' },
-      'spawn-monsters': { label: '生成怪物', hint: '關掉就不會有殭屍苦力怕等敵對生物。' },
+      'enable-command-block': { label: '允許指令方塊', hint: '地圖與紅石作品常用，一般生存不需要。' },
       'view-distance': {
         label: '視野距離',
         hint: '玩家能看多遠。數字越大越吃伺服器效能，人多時建議調低。'
@@ -420,21 +425,18 @@ export default {
       '如果試用額度用完或 90 天到期，整台機器連同上面的備份都會被 Google 刪除。真正保得住世界的做法是按「存到電腦」把檔案下載回來。CraftLift 在你按下關機時會自動做這件事。',
     keepNote: '每一種各自保留最新的 {{count}} 份，較舊的會自動刪除以節省空間。',
     interval: '自動備份間隔（小時）',
-    intervalHint: '伺服器會依照這個間隔自動備份世界。備份前會先請 Minecraft 把資料寫入磁碟。',
-    intervalScope:
-      '這個間隔只管世界。伺服器設定不照時間備份——它只有在被改過之後才會多一份，沒動就不會重複存。',
+    intervalHint: '此設定僅套用於世界備份，不含伺服器設定及模組。',
     empty: '（還沒有任何備份）',
     saveToPc: '下載至電腦',
     groups: {
       world: {
         title: '世界',
-        desc: '你的存檔。依照上面的間隔自動備份。',
         createNow: '立刻備份世界',
         packing: '正在打包世界'
       },
       setup: {
         title: '伺服器設定',
-        desc: '模組、伺服器設定、白名單與管理員名單。自動備份只有在改動過之後才會多一份，按下按鈕則不管有沒有變動都會存一份現在的。',
+        hint: '伺服器設定僅在變更後備份。',
         createNow: '立刻備份設定',
         packing: '正在打包設定'
       }
